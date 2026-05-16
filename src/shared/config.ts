@@ -13,7 +13,8 @@ export const LANE_X: Readonly<Record<Lane, number>> = {
 
 // Forward run speed in world units per second. "Dash" feel - the camera and
 // scenery should fly past quickly enough to give the player a sense of urgency.
-export const RUN_SPEED_UNITS_PER_SEC = 14;
+// Currently tuned for Tron-style sprint feel.
+export const RUN_SPEED_UNITS_PER_SEC = 24;
 
 export const LANE_SWITCH_DURATION_MS = 200;
 
