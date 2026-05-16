@@ -98,6 +98,21 @@ describe('nextObstacleGroup lane-mask invariants', () => {
       schedule = nextSchedule;
     }
   });
+
+  it('colorVariant is always one of red / blue / green', () => {
+    let schedule = createSpawnSchedule(SEED);
+    const seen = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      const { group, schedule: nextSchedule } = nextObstacleGroup(schedule);
+      expect(['red', 'blue', 'green']).toContain(group.colorVariant);
+      seen.add(group.colorVariant);
+      schedule = nextSchedule;
+    }
+    // Sanity: across 1000 draws we should see all three colours at least once.
+    expect(seen.has('red')).toBe(true);
+    expect(seen.has('blue')).toBe(true);
+    expect(seen.has('green')).toBe(true);
+  });
 });
 
 describe('nextObstacleGroup worldZ', () => {

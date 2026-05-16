@@ -7,9 +7,12 @@ import {
 } from '../shared/config';
 import type {
   Lane,
+  ObstacleColorVariant,
   ObstacleGroup,
   ObstacleVariantId,
 } from '../shared/types';
+
+const COLOR_VARIANTS: readonly ObstacleColorVariant[] = ['red', 'blue', 'green'];
 
 export interface ObstacleSpawnSchedule {
   readonly nextSpawnDistance: number;
@@ -90,10 +93,18 @@ export function nextObstacleGroup(
   );
   const variant = candidates[variantIdx]!;
 
+  const r5 = mulberry32Step(r4.nextSeed);
+  const colorIdx = Math.min(
+    COLOR_VARIANTS.length - 1,
+    Math.floor(r5.value * COLOR_VARIANTS.length),
+  );
+  const colorVariant = COLOR_VARIANTS[colorIdx]!;
+
   const id = schedule.lastSpawnedId + 1;
   const group: ObstacleGroup = {
     id,
     variant,
+    colorVariant,
     blockedLanes,
     worldZ: OBSTACLES_INITIAL_SPAWN_Z,
     previousWorldZ: OBSTACLES_INITIAL_SPAWN_Z,
@@ -103,6 +114,7 @@ export function nextObstacleGroup(
     event: 'obstacle_spawned',
     id,
     variant,
+    colorVariant,
     blockedLanes,
     worldZ: group.worldZ,
   });
@@ -111,7 +123,7 @@ export function nextObstacleGroup(
     group,
     schedule: {
       nextSpawnDistance: schedule.nextSpawnDistance + gap,
-      seed: r4.nextSeed,
+      seed: r5.nextSeed,
       lastSpawnedId: id,
     },
   };

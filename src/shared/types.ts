@@ -11,6 +11,8 @@ export type ObstacleVariantId =
   | 'trapezoid-prism'
   | 'wide-bar';
 
+export type ObstacleColorVariant = 'red' | 'blue' | 'green';
+
 export interface InputEvent {
   readonly direction: Direction;
   readonly source: InputSource;
@@ -39,6 +41,7 @@ export interface WorldState {
 export interface ObstacleGroup {
   readonly id: number;
   readonly variant: ObstacleVariantId;
+  readonly colorVariant: ObstacleColorVariant;
   readonly blockedLanes: readonly Lane[];
   worldZ: number;
   previousWorldZ: number;

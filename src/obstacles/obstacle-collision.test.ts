@@ -27,6 +27,7 @@ function group(
   return {
     id: 1,
     variant: blockedLanes.length === 2 ? 'wide-bar' : 'cube',
+    colorVariant: 'red',
     blockedLanes,
     worldZ,
     previousWorldZ,

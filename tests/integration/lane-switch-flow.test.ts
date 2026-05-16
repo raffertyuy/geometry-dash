@@ -136,6 +136,7 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     let obstacle: ObstacleGroup = {
       id: 1,
       variant: 'cube',
+      colorVariant: 'red',
       blockedLanes: ['centre'],
       worldZ: -5,
       previousWorldZ: -5,
