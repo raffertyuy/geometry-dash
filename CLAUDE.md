@@ -37,14 +37,16 @@ Constraints to keep in mind:
 - `specs/<###-name>/` - per-feature artifacts: `spec.md`, `plan.md`, `tasks.md`, etc. (created by skills, one folder per feature branch).
 
 <!-- SPECKIT START -->
-**Active feature**: `001-lane-runner` — Lane Runner Core Movement.
+**Active feature**: `002-scoring-hud` — Scoring HUD (live score + elapsed timer).
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/001-lane-runner/plan.md` (technical context + constitution check + project tree)
-- `specs/001-lane-runner/spec.md` (user stories, requirements, success criteria)
-- `specs/001-lane-runner/research.md` (Phase 0 decisions + platform gotchas)
-- `specs/001-lane-runner/data-model.md` (entities + state machine)
-- `specs/001-lane-runner/contracts/module-contracts.md` (public module APIs)
-- `specs/001-lane-runner/quickstart.md` (dev / test / build / deploy steps)
+- `specs/002-scoring-hud/plan.md` (technical context + constitution check + project tree)
+- `specs/002-scoring-hud/spec.md` (user stories, requirements, success criteria)
+- `specs/002-scoring-hud/research.md` (Phase 0 decisions for this slice)
+- `specs/002-scoring-hud/data-model.md` (derived score + timer)
+- `specs/002-scoring-hud/contracts/module-contracts.md` (the new `src/score/` module API + DOM contract)
+- `specs/002-scoring-hud/quickstart.md` (slice-specific validation steps)
+
+The foundational architecture (Three.js scene + DOM overlays + library-first modules + the lane-runner mechanics) is captured in `specs/001-lane-runner/`.
 <!-- SPECKIT END -->
