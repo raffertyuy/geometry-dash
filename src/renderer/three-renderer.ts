@@ -24,15 +24,19 @@ const COL_PLAYER_BODY = 0x110804;
 // Note: the trail's amber colour is decomposed into TRAIL_R/G/B below for
 // per-vertex fade in the Line2 vertex-colour buffer.
 const COL_SPEED_LINE = 0x8ad0ff;
-// Per-color obstacle material palette. Each entry pairs a darker base
-// (for unlit faces / shading) with a brighter emissive accent (for the
-// lit face + a touch of bloom on edges). Tuned so the geometry's flat-
-// shaded faces are visibly distinct from one another, not flooded by
-// emissive light.
-const COL_OBSTACLES: Readonly<Record<ObstacleColorVariant, { base: number; emissive: number }>> = {
-  red:   { base: 0x4a0a18, emissive: 0xc12238 },
-  blue:  { base: 0x0a1a55, emissive: 0x2548c8 },
-  green: { base: 0x0a3a18, emissive: 0x1e9a3a },
+// Per-colour obstacle palette. Each entry has three parts:
+//   - body: the (darker, slightly emissive) face colour
+//   - bodyEmit: the colour the body's faces glow with at low intensity
+//   - edge: the bright line colour overlaid on the geometric edges
+// The Tron look comes from the edges; the body just adds a coloured wash.
+const COL_OBSTACLES: Readonly<Record<ObstacleColorVariant, {
+  base: number;
+  emissive: number;
+  edge: number;
+}>> = {
+  red:   { base: 0x2a0612, emissive: 0xb02238, edge: 0xff3a5e },
+  blue:  { base: 0x07154a, emissive: 0x2a55d8, edge: 0x4ab8ff },
+  green: { base: 0x062a0e, emissive: 0x2aa040, edge: 0x4fff8a },
 };
 
 // ---- Scene geometry ------------------------------------------------------
@@ -344,40 +348,38 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
 
   // ---- Obstacle mesh pool ----------------------------------------------
 
-  // Three colour-variant materials sharing the same physical properties.
-  // flatShading: true gives each face its own normal -> visibly faceted
-  // geometry that reads as 3D even on simple boxes and the custom
-  // trapezoid prism. toneMapped: true lets the ACES tonemap roll off the
-  // emissive so the surface still picks up directional shading instead of
-  // being a flat patch of colour.
-  const obstacleMaterials: Readonly<Record<ObstacleColorVariant, THREE.MeshStandardMaterial>> = {
-    red: new THREE.MeshStandardMaterial({
-      color: COL_OBSTACLES.red.base,
-      emissive: COL_OBSTACLES.red.emissive,
-      emissiveIntensity: 0.32,
-      roughness: 0.55,
-      metalness: 0.25,
+  // Each obstacle is a THREE.Group containing two children:
+  //   - body: a flat-shaded Mesh with the dark coloured material
+  //   - edges: a LineSegments overlay of the geometry's sharp edges, in a
+  //     bright glowing colour that bloom amplifies
+  // This gives the classic Tron silhouette: visible 3D geometry defined
+  // by glowing outlines, independent of light direction or face shading.
+  function makeBodyMaterial(c: ObstacleColorVariant): THREE.MeshStandardMaterial {
+    return new THREE.MeshStandardMaterial({
+      color: COL_OBSTACLES[c].base,
+      emissive: COL_OBSTACLES[c].emissive,
+      emissiveIntensity: 0.45,
+      roughness: 0.5,
+      metalness: 0.2,
       flatShading: true,
       toneMapped: true,
-    }),
-    blue: new THREE.MeshStandardMaterial({
-      color: COL_OBSTACLES.blue.base,
-      emissive: COL_OBSTACLES.blue.emissive,
-      emissiveIntensity: 0.32,
-      roughness: 0.55,
-      metalness: 0.25,
-      flatShading: true,
-      toneMapped: true,
-    }),
-    green: new THREE.MeshStandardMaterial({
-      color: COL_OBSTACLES.green.base,
-      emissive: COL_OBSTACLES.green.emissive,
-      emissiveIntensity: 0.32,
-      roughness: 0.55,
-      metalness: 0.25,
-      flatShading: true,
-      toneMapped: true,
-    }),
+    });
+  }
+  function makeEdgeMaterial(c: ObstacleColorVariant): THREE.LineBasicMaterial {
+    return new THREE.LineBasicMaterial({
+      color: COL_OBSTACLES[c].edge,
+      toneMapped: false,
+    });
+  }
+  const obstacleBodyMaterials: Readonly<Record<ObstacleColorVariant, THREE.MeshStandardMaterial>> = {
+    red: makeBodyMaterial('red'),
+    blue: makeBodyMaterial('blue'),
+    green: makeBodyMaterial('green'),
+  };
+  const obstacleEdgeMaterials: Readonly<Record<ObstacleColorVariant, THREE.LineBasicMaterial>> = {
+    red: makeEdgeMaterial('red'),
+    blue: makeEdgeMaterial('blue'),
+    green: makeEdgeMaterial('green'),
   };
 
   function createTrapezoidGeometry(): THREE.BufferGeometry {
@@ -416,33 +418,55 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     return geometry;
   }
 
-  // Lower segment counts on the curved primitives so flat-shaded facets are
-  // chunky and read as Tron-geometric rather than rounded.
+  // The 'sphere' variant uses an icosahedron rather than a smooth sphere so
+  // it has real geometric edges to outline (a smooth sphere has none).
   const obstacleGeometries: Readonly<Record<ObstacleVariantId, THREE.BufferGeometry>> = {
     cube: new THREE.BoxGeometry(1.4, 1.4, 1.4),
     pillar: new THREE.BoxGeometry(1.0, 2.6, 1.0),
     cylinder: new THREE.CylinderGeometry(0.7, 0.7, 1.6, 10),
-    sphere: new THREE.SphereGeometry(0.8, 12, 8),
+    sphere: new THREE.IcosahedronGeometry(0.85, 0),
     'trapezoid-prism': createTrapezoidGeometry(),
     'wide-bar': new THREE.BoxGeometry(4.0, 1.2, 1.0),
   };
 
-  const obstaclePool: Map<ObstacleVariantId, THREE.Mesh[]> = new Map();
+  // Pre-compute edge geometry per variant (extracts ridges where face
+  // normals differ by more than 1 degree). Shared across all instances of
+  // the variant since the geometry never changes.
+  const obstacleEdgeGeometries: Readonly<Record<ObstacleVariantId, THREE.EdgesGeometry>> = {
+    cube: new THREE.EdgesGeometry(obstacleGeometries.cube, 1),
+    pillar: new THREE.EdgesGeometry(obstacleGeometries.pillar, 1),
+    cylinder: new THREE.EdgesGeometry(obstacleGeometries.cylinder, 1),
+    sphere: new THREE.EdgesGeometry(obstacleGeometries.sphere, 1),
+    'trapezoid-prism': new THREE.EdgesGeometry(obstacleGeometries['trapezoid-prism'], 1),
+    'wide-bar': new THREE.EdgesGeometry(obstacleGeometries['wide-bar'], 1),
+  };
+
+  interface ObstacleSlot {
+    readonly group: THREE.Group;
+    readonly body: THREE.Mesh;
+    readonly edges: THREE.LineSegments;
+  }
+
+  const obstaclePool: Map<ObstacleVariantId, ObstacleSlot[]> = new Map();
   for (const variantId of Object.keys(obstacleGeometries) as ObstacleVariantId[]) {
-    const meshes: THREE.Mesh[] = [];
+    const slots: ObstacleSlot[] = [];
     for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
-      // Initial material is one of the three; per-frame updateObstacles
-      // swaps it according to the group's colourVariant.
-      const mesh = new THREE.Mesh(obstacleGeometries[variantId], obstacleMaterials.red);
-      mesh.visible = false;
-      scene.add(mesh);
-      meshes.push(mesh);
+      const slotGroup = new THREE.Group();
+      const body = new THREE.Mesh(obstacleGeometries[variantId], obstacleBodyMaterials.red);
+      const edges = new THREE.LineSegments(
+        obstacleEdgeGeometries[variantId],
+        obstacleEdgeMaterials.red,
+      );
+      slotGroup.add(body);
+      slotGroup.add(edges);
+      slotGroup.visible = false;
+      scene.add(slotGroup);
+      slots.push({ group: slotGroup, body, edges });
     }
-    obstaclePool.set(variantId, meshes);
+    obstaclePool.set(variantId, slots);
   }
 
   function updateObstacles(groups: readonly ObstacleGroup[]): void {
-    // Walk each variant's pool, assigning visible meshes to active groups.
     const usage = new Map<ObstacleVariantId, number>();
     for (const variantId of obstaclePool.keys()) usage.set(variantId, 0);
 
@@ -450,8 +474,8 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
       const pool = obstaclePool.get(group.variant);
       if (!pool) continue;
       const used = usage.get(group.variant)!;
-      if (used >= pool.length) continue; // pool exhausted (shouldn't normally happen)
-      const mesh = pool[used]!;
+      if (used >= pool.length) continue;
+      const slot = pool[used]!;
       usage.set(group.variant, used + 1);
 
       let xPos: number;
@@ -462,22 +486,20 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
         const x1 = LANE_X[group.blockedLanes[1]!];
         xPos = (x0 + x1) / 2;
       }
-      // Trapezoid prism's geometry has its base at y=0 already, so offset by 0.
-      // For all other shapes, the centre is at the centre of the box/sphere.
       const variantHeight = OBSTACLE_HEIGHTS[group.variant];
       const yPos =
         group.variant === 'trapezoid-prism' ? 0 : variantHeight / 2;
 
-      mesh.position.set(xPos, yPos, group.worldZ);
-      mesh.material = obstacleMaterials[group.colorVariant];
-      mesh.visible = true;
+      slot.group.position.set(xPos, yPos, group.worldZ);
+      slot.body.material = obstacleBodyMaterials[group.colorVariant];
+      slot.edges.material = obstacleEdgeMaterials[group.colorVariant];
+      slot.group.visible = true;
     }
 
-    // Hide any pool slots not used this frame.
     for (const [variantId, pool] of obstaclePool) {
       const used = usage.get(variantId)!;
       for (let i = used; i < pool.length; i++) {
-        pool[i]!.visible = false;
+        pool[i]!.group.visible = false;
       }
     }
   }
