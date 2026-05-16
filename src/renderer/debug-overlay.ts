@@ -1,4 +1,3 @@
-import Phaser from 'phaser';
 import { DEBUG } from '../shared/config';
 import type { InputEvent, PlayerState, WorldState } from '../shared/types';
 
@@ -7,20 +6,13 @@ export interface DebugOverlay {
   destroy(): void;
 }
 
-export function createDebugOverlay(scene: Phaser.Scene): DebugOverlay {
-  if (!DEBUG) {
+export function createDebugOverlay(host: HTMLElement | null): DebugOverlay {
+  if (!DEBUG || host === null) {
     return { update: () => undefined, destroy: () => undefined };
   }
 
-  const text = scene.add
-    .text(16, 16, '', {
-      fontFamily: 'monospace',
-      fontSize: '20px',
-      color: '#e8e8ef',
-      backgroundColor: 'rgba(0, 0, 0, 0.55)',
-      padding: { x: 8, y: 6 },
-    })
-    .setDepth(1000);
+  host.classList.remove('hidden');
+  host.textContent = '';
 
   function update(
     p: PlayerState,
@@ -37,11 +29,13 @@ export function createDebugOverlay(scene: Phaser.Scene): DebugOverlay {
       `tickMs:    ${w.tickMs.toFixed(0)}`,
       `lastInput: ${lastInput ? `${lastInput.direction} (${lastInput.source})` : '-'}`,
     ];
-    text.setText(lines.join('\n'));
+    // host is captured by closure.
+    (host as HTMLElement).textContent = lines.join('\n');
   }
 
   function destroy(): void {
-    text.destroy();
+    host?.classList.add('hidden');
+    if (host) host.textContent = '';
   }
 
   return { update, destroy };

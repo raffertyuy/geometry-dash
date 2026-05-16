@@ -7,7 +7,7 @@ This is the public-API surface of every module in this slice. Each module's `ind
 Module dependency direction (no cycles):
 
 ```
-phaser/  ──┐
+game/    ──┐
            ├──► renderer/ ──► shared/
 main.ts ──┘
            └──► runner-engine/ ─┐
@@ -15,7 +15,7 @@ main.ts ──┘
            └──► input-adapter/ ─┘
 ```
 
-Only `renderer/` and `phaser/` may import from the `phaser` npm package. The other modules MUST be importable in a Node test environment with no DOM/canvas.
+Only `renderer/` and `game/` may import from the `three` npm package. The other modules MUST be importable in a Node test environment with no DOM/canvas.
 
 ---
 
@@ -53,17 +53,17 @@ export interface WorldState {
 ```ts
 // shared/config.ts
 export const LANES: readonly Lane[];               // ['left', 'centre', 'right']
-export const LANE_X: Record<Lane, number>;         // { left: 180, centre: 360, right: 540 }
-export const LOGICAL_WIDTH: 720;
-export const LOGICAL_HEIGHT: 1280;
-export const RUN_SPEED_UNITS_PER_SEC: 200;
+export const LANE_X: Record<Lane, number>;         // 3D world units: { left: -2, centre: 0, right: 2 }
+export const RUN_SPEED_UNITS_PER_SEC: 6;           // world units per second (was 200 logical-px/sec in the 2D era)
 export const LANE_SWITCH_DURATION_MS: 200;
-export const SWIPE_MIN_HORIZONTAL_PX: 30;
+export const SWIPE_MIN_HORIZONTAL_PX: 30;          // screen pixels (not world units) - swipes are read from the DOM
 export const SWIPE_MAX_DURATION_MS: 500;
 export const SWIPE_HORIZONTAL_DOMINANCE: 2;        // |dx| must be >= 2 * |dy|
 export const INPUT_COALESCE_WINDOW_MS: 50;
 export const DEBUG: boolean;                       // true iff URL ?debug=1
 ```
+
+Post-pivot the 2D logical canvas constants (`LOGICAL_WIDTH=720`, `LOGICAL_HEIGHT=1280`) are gone - Three.js uses a true 3D world space, not a fixed-resolution canvas. Swipe thresholds remain in screen pixels because they describe a user's finger gesture, which is a DOM concept.
 
 **Rules**:
 
@@ -190,67 +190,72 @@ export function detectSwipe(
 
 ---
 
-## `renderer/` - the only module that touches Phaser sprites
+## `renderer/` - the only module that touches Three.js
 
 ```ts
 // renderer/index.ts
-import type { PlayerState, WorldState } from '../shared/types';
+import type { PlayerState, WorldState, InputEvent } from '../shared/types';
 
-export interface RunnerRenderer {
-  /** Called once per Phaser update. Reads state, draws frame. */
+export interface ThreeRenderer {
+  /** Called once per requestAnimationFrame tick. Reads state, mutates the scene, calls renderer.render. */
   draw(player: PlayerState, world: WorldState): void;
-  /** Called on Scale Manager resize. Updates internal display dimensions. */
+  /** Called from a window resize listener. Updates camera aspect + renderer size. */
   resize(widthPx: number, heightPx: number): void;
-  /** Tears down created GameObjects on scene exit. */
+  /** Tears down GPU resources on shutdown. */
   destroy(): void;
 }
 
-export function createRunnerRenderer(scene: Phaser.Scene): RunnerRenderer;
+export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer;
 
 export interface DebugOverlay {
   update(player: PlayerState, world: WorldState, lastInput?: InputEvent): void;
   destroy(): void;
 }
 
-export function createDebugOverlay(scene: Phaser.Scene): DebugOverlay;
+export function createDebugOverlay(host: HTMLElement): DebugOverlay;
 ```
 
 **Behaviour**:
 
-- `createRunnerRenderer(scene)` instantiates Phaser GameObjects (three lane rectangles + one player rectangle) parented to `scene`.
-- `draw(player, world)` reads logical lane positions, maps them to scene coordinates, sets the player sprite's x. Does NOT mutate inputs.
-- `createDebugOverlay` returns a no-op stub when `DEBUG === false`; otherwise creates a small text overlay top-left.
-- `RunnerRenderer` and `DebugOverlay` MUST own their Phaser GameObjects and tear them down on `destroy()` to avoid leaks across scene transitions.
+- `createThreeRenderer(canvas)` attaches a WebGL renderer to the given canvas, builds a 3D scene (perspective camera, ambient + directional lights, ground plane, lane dividers, scrolling rungs, player mesh), and returns a controller.
+- `draw(player, world)` reads `LANE_X` world positions, interpolates `mesh.position.x` via `easeOutCubic(animProgress)`, advances the scrolling rungs in Z by the distance delta, and calls `renderer.render(scene, camera)`. Does NOT mutate inputs.
+- `createDebugOverlay(host)` returns a no-op stub when `DEBUG === false`; otherwise toggles visibility on a DOM element with `id="debug-overlay"` (it does NOT create the element - that lives in `index.html`).
+- `ThreeRenderer` and `DebugOverlay` MUST own their GPU resources / DOM mutations and tear them down on `destroy()`.
 
-**Test obligations**: smoke test only (mounts the renderer in a JSDOM-backed Phaser headless mode and asserts no errors). Per Constitution II, visual code is exempt from strict TDD.
+**Test obligations**: smoke test only - currently DEFERRED because Three.js requires a real WebGL context which jsdom does not provide and node-canvas needs Windows native build tools. Per Constitution II, visual code is exempt from strict TDD; manual validation in T028/T036 covers this.
 
 ---
 
-## `phaser/` - Scenes (integration glue)
+## `game/` - integration glue (was `phaser/` pre-pivot)
 
 ```ts
-// phaser/phaser-config.ts
-export const GAME_CONFIG: Phaser.Types.Core.GameConfig;
+// game/game-loop.ts
+export interface GameLoopHandles {
+  /** Tears down listeners + the renderer. */
+  dispose(): void;
+}
 
-// phaser/scenes/boot-scene.ts
-export class BootScene extends Phaser.Scene { ... }
+export interface GameLoopHostElements {
+  readonly canvas: HTMLCanvasElement;
+  readonly startScreen: HTMLElement;
+  readonly pauseOverlay: HTMLElement;
+  readonly debugOverlay: HTMLElement;
+}
 
-// phaser/scenes/start-scene.ts
-export class StartScene extends Phaser.Scene { ... }
-
-// phaser/scenes/run-scene.ts
-export class RunScene extends Phaser.Scene { ... }
+export function createGameLoop(host: GameLoopHostElements): GameLoopHandles;
 ```
 
 **Rules**:
 
-- Scenes MUST NOT contain game logic. They:
-  1. Instantiate the relevant pure modules (`createPlayerState()`, `createWorldState()`, `createInputAdapter(...)`).
-  2. Bridge Phaser input events into `input-adapter.handleKeyDown` / `handlePointerDown` / etc.
-  3. Call `tickPlayer` and `tickWorld` each Phaser update tick, using `delta` from `update(time, delta)`.
-  4. Call `renderer.draw(player, world)`.
-- Scenes MAY import from `renderer/` and from any `*/index.ts` re-export.
-- Scenes MUST NOT mutate `PlayerState` or `WorldState` directly - they replace them by reassigning the result of pure-module calls.
+- The game loop MUST NOT contain game logic. It:
+  1. Instantiates the relevant pure modules (`createPlayerState()`, `createWorldState()`, `createInputAdapter(...)`, `createThreeRenderer(canvas)`, `createDebugOverlay(debugOverlay)`).
+  2. Owns scene state: `'start-screen' | 'running' | 'paused'`. Initial state is `'start-screen'`.
+  3. Bridges DOM keyboard + pointer events into `input-adapter.handleKeyDown` / `handlePointerDown` / `handlePointerUp`. The first key/pointer event in `'start-screen'` state hides the start overlay and transitions to `'running'`.
+  4. Runs a `requestAnimationFrame` loop. Each frame computes `dtMs = now - lastNow` (capped at 100 ms), and only when state is `'running'` it calls `tickPlayer`, `tickWorld`, `renderer.draw`, `debugOverlay.update`.
+  5. Wires `document.visibilitychange` and `window.blur` -> `pauseRun` + show pause overlay; on visible/focus, set `isAwaitingResume = true` and require any input to resume.
+  6. Wires `window.resize` -> `renderer.resize`.
+- MAY import from `renderer/`, `three`, and from any `*/index.ts` re-export.
+- MUST NOT mutate `PlayerState` or `WorldState` directly - replaces them by reassigning the result of pure-module calls.
 
 ---
 
@@ -258,34 +263,34 @@ export class RunScene extends Phaser.Scene { ... }
 
 ```ts
 // main.ts
-// 1. Read DEBUG from URL query.
-// 2. Create the Phaser game with GAME_CONFIG.
-// 3. Wire `window.addEventListener('visibilitychange', ...)` -> pause/resume.
+// 1. Read DEBUG from URL query (already done by shared/config).
+// 2. Resolve canvas + overlay DOM elements by id.
+// 3. Call createGameLoop({ canvas, startScreen, pauseOverlay, debugOverlay }).
 // No exports.
 ```
 
-This is the only place that ties the modules together at runtime. It is intentionally tiny.
+This is the only place that ties the DOM to the game-loop module. It is intentionally tiny.
 
 ---
 
 ## Boundary enforcement (lint rule sketch)
 
-The `.eslintrc.cjs` adds a `no-restricted-imports` configuration roughly equivalent to:
+The `eslint.config.js` (flat config) adds a `no-restricted-imports` configuration roughly equivalent to:
 
 ```js
 rules: {
   'no-restricted-imports': ['error', {
     patterns: [
-      { group: ['phaser', 'phaser/*'], message: 'Only renderer/ and phaser/ may import from Phaser.' },
+      { group: ['three', 'three/*'], message: 'Only src/renderer/ and src/game/ may import from Three.js.' },
       { group: ['*/runner-engine/!(index)', '*/lane-state/!(index)', '*/input-adapter/!(index)', '*/renderer/!(index)'],
         message: 'Import from a module via its index.ts only.' },
     ],
   }],
 },
 overrides: [
-  { files: ['src/renderer/**', 'src/phaser/**', 'src/main.ts'],
+  { files: ['src/renderer/**', 'src/game/**', 'src/main.ts'],
     rules: { 'no-restricted-imports': ['error', { patterns: [
-      // remove the phaser ban for these files
+      // remove the three ban for these files; keep the index.ts-only rule
       { group: ['*/runner-engine/!(index)', '*/lane-state/!(index)', '*/input-adapter/!(index)', '*/renderer/!(index)'],
         message: 'Import from a module via its index.ts only.' },
     ]}] },
@@ -293,4 +298,4 @@ overrides: [
 ],
 ```
 
-The exact wording will be tuned in implementation; the *intent* (Phaser is allowed only in the integration layer; pure modules expose only `index.ts`) is the contract.
+The exact wording will be tuned in implementation; the *intent* (Three.js is allowed only in the integration layer; pure modules expose only `index.ts`) is the contract.

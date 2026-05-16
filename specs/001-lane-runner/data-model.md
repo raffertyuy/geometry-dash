@@ -104,21 +104,22 @@ The lane-state module owns this state machine. All transitions are pure function
 - Easing function: `easeOutCubic(t) = 1 - (1 - t)^3` applied to `animProgress` before computing the rendered x-position.
 - Animation duration: 200 ms (well under the 250 ms desktop / 350 ms mobile FR-007 budgets).
 
-## Lane → screen coordinate mapping (rendering-only concern)
+## Lane → world coordinate mapping (rendering-only concern)
 
-These constants live in `shared/config.ts` but are listed here because they bridge the data model and the renderer.
+These constants live in `shared/config.ts` but are listed here because they bridge the data model and the renderer. Post-pivot they describe 3D world-space X positions in arbitrary world units.
 
-| Lane     | Logical x (in a 720 px wide logical canvas) |
-|----------|----------------------------------------------|
-| `left`   | 180                                          |
-| `centre` | 360                                          |
-| `right`  | 540                                          |
+| Lane     | World x (Three.js scene coordinates) |
+|----------|--------------------------------------|
+| `left`   | -2                                   |
+| `centre` |  0                                   |
+| `right`  | +2                                   |
 
 The rendered player x is:
 
 ```text
-x = laneX(currentLane) +
-    (laneX(targetLane) - laneX(currentLane)) * easeOutCubic(animProgress)
+mesh.position.x =
+  laneX(currentLane) +
+  (laneX(targetLane) - laneX(currentLane)) * easeOutCubic(animProgress)
 ```
 
 When `targetLane` is `null`, the second term is zero by definition.

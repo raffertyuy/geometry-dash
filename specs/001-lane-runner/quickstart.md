@@ -22,7 +22,7 @@ From the repo root, on branch `001-lane-runner`:
 npm install
 ```
 
-After `/speckit-tasks` and the implementation slice complete, `package.json` will list `phaser`, `vite`, `typescript`, `vitest`, and a small set of dev dependencies.
+After `/speckit-tasks` and the implementation slice complete, `package.json` will list `three`, `vite`, `typescript`, `vitest`, and a small set of dev dependencies. (Pre-pivot listed `phaser` instead of `three`.)
 
 ## 2. Run the dev server
 
@@ -89,7 +89,7 @@ Runs `tsc --noEmit` against the strict config. CI will block PRs that fail type-
 npm run lint
 ```
 
-This is where Constitution Principle III is enforced: a `lane-state.ts` that tries to `import 'phaser'` will fail here, not in code review.
+This is where Constitution Principle III is enforced: a `lane-state.ts` that tries to `import 'three'` will fail here, not in code review.
 
 ## 6. Production build
 
@@ -149,6 +149,6 @@ When that list is checked, the slice is mergeable to `main`.
 
 - **G2** "Held key skips lanes" - check `KeyboardEvent.repeat` filtering in `input-adapter.handleKeyDown`.
 - **G3** "Tap fires two lane changes" - check the 50 ms coalesce window in `input-adapter`.
-- **G5** "Mobile looks wrong / cropped" - check `Scale.FIT` in `phaser-config.ts`.
+- **G5** "Mobile looks wrong / cropped" - check the `window.resize` handler in `src/game/game-loop.ts` and that `camera.aspect` + `renderer.setSize` are being called.
 - **G6** "Distance kept advancing after I closed the tab" - check the `visibilitychange` wiring in `main.ts`.
 - **G1** "Runs faster on my laptop than my phone" - check that `tickWorld` and `tickPlayer` take `dtMs` (delta), not assume a fixed frame budget.

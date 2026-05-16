@@ -21,9 +21,9 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['phaser', 'phaser/*'],
+              group: ['three', 'three/*'],
               message:
-                'Only modules under src/renderer/ and src/phaser/ may import from Phaser. Pure-logic modules must remain framework-agnostic (Constitution Principle III).',
+                'Only modules under src/renderer/ and src/game/ may import from Three.js. Pure-logic modules must remain framework-agnostic (Constitution Principle III).',
             },
             {
               group: [
@@ -41,8 +41,8 @@ export default tseslint.config(
     },
   },
   {
-    // Allow Phaser imports inside the integration layer.
-    files: ['src/renderer/**/*.ts', 'src/phaser/**/*.ts', 'src/main.ts'],
+    // Allow Three.js imports inside the integration layer.
+    files: ['src/renderer/**/*.ts', 'src/game/**/*.ts', 'src/main.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

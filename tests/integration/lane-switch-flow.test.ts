@@ -50,7 +50,7 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     world = tickWorld(world, 100);
     drawMock(player, world);
     expect(player.animProgress).toBeCloseTo(0.5, 5);
-    expect(world.distanceUnits).toBeCloseTo(20, 5); // 100ms @ 200 u/s
+    expect(world.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC * 0.1, 5);
 
     // Frame 2: animation completes at 200ms total.
     player = tickPlayer(player, 100);
@@ -58,7 +58,7 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     drawMock(player, world);
     expect(player.currentLane).toBe('right');
     expect(player.targetLane).toBeNull();
-    expect(world.distanceUnits).toBeCloseTo(40, 5);
+    expect(world.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC * 0.2, 5);
 
     // Renderer was called three times with monotonically-non-decreasing distance.
     expect(drawCalls).toHaveLength(3);
@@ -119,6 +119,6 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     world = tickWorld(world, 200);
     expect(player.currentLane).toBe('right');
     expect(player.targetLane).toBeNull();
-    expect(world.distanceUnits).toBeCloseTo(40, 5);
+    expect(world.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC * 0.2, 5);
   });
 });

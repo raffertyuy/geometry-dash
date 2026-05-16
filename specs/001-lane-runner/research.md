@@ -8,19 +8,33 @@ The spec had no remaining `[NEEDS CLARIFICATION]` markers, so this research focu
 
 ## Tech-stack decisions
 
-### Why Phaser 3, not vanilla canvas
+### Pivot from Phaser to Three.js (2026-05-16 evening)
 
-- **Decision**: Use Phaser 3 (latest stable, ^3.85) as the runtime game framework.
+- **Decision**: Replace Phaser 3 with Three.js (^0.170) as the runtime rendering library. Same evening as the initial Phaser-based MVP was playtested.
+- **Trigger**: After manually validating the 2D Phaser MVP (T028 acceptance scenarios all passed), the user clarified they actually wanted a 3D look modelled on polygon.uy.sg (a low-poly Three.js shooter we inspected: uses Three.js 0.160 + GLTFLoader r147, vanilla `<script>` tags, DOM HUD over the WebGL canvas).
 - **Rationale**:
-  - Phaser handles a real set of "you didn't know you needed this" platform issues by default - delta-time-correct game loop, multi-input normalisation (keyboard + touch + pointer), iOS audio unlock, scale management across 320 px - 4K screens, tab-visibility pausing. Coming in to game dev for the first time, surfacing these by *not* tripping on them is worth the framework cost.
-  - Bundle size: ~670 KB minified, ~220 KB gzipped. Fits the constitution's 500 KB gzipped critical-JS budget with headroom for our own ~30 KB of code.
-  - Mature scene management makes the future shape of the game (Boot → Start → Run → Question Modal → GameOver) trivial to add later.
-  - Active community (community-built Phaser endless runners can be cribbed for patterns).
-- **Alternatives considered**:
-  - **Vanilla TypeScript + Canvas 2D.** Smaller (~30 KB total), zero framework lock-in, fully aligned with Constitution Principle I. Rejected because the user explicitly weighed safety-net value over minimal bundle, and Phaser fits the perf budget.
-  - **Phaser 2.** Legacy; no advantage over 3.x.
-  - **PixiJS + custom game loop.** Pixi gives renderer only; you'd write input/scene/scale yourself. Worst of both worlds for this game.
-  - **Three.js / Babylon.** 3D engines; overkill for a 2D lane runner.
+  - The library-first architecture from the original plan was deliberately structured to make this kind of swap cheap: lane-state, runner-engine, input-adapter, swipe-detector are all framework-agnostic. The pivot only touched `src/renderer/`, `src/phaser/` (renamed to `src/game/`), `index.html`, the dependency list, and the ESLint boundary rule. **All 59 pure-logic tests passed unchanged.**
+  - Bundle size went DOWN: Three.js core ~150 KB gzipped vs Phaser ~220 KB gzipped. Net change to our gzipped JS budget: -70 KB freed.
+  - Three.js maps the game's spatial mental model (three lanes spaced in X, distance accruing in Z, camera behind/above the player) cleanly onto a 3D scene. Doing the same in 2D required fake parallax/scrolling that fought the perspective-runner aesthetic.
+- **What we GAVE UP vs Phaser**:
+  - Phaser's Scale Manager (free responsive layout) - replaced by ~15 lines of `window.addEventListener('resize', ...)` updating camera aspect and renderer size.
+  - Phaser's Scene system (Boot/Start/Run lifecycle) - replaced by a small state enum + DOM overlays for the start/pause screens.
+  - Phaser's input plugin (gesture detection, pointer/touch/mouse normalisation) - was never really used; the `input-adapter` already does this.
+  - Phaser's audio system - not used yet; will likely use Howler.js or the WebAudio API directly when audio is added.
+- **Alternatives considered (during the pivot)**:
+  - **Babylon.js.** Comparable 3D engine, more batteries-included than Three.js but larger bundle (~400 KB gzipped). Rejected because polygon.uy.sg uses Three.js and that's the user's reference design.
+  - **Raw WebGL.** Hand-roll the renderer. Rejected: weeks of work for no real Library-First gain (we'd still wrap WebGL in a renderer module the rest of the code calls).
+  - **Stay on Phaser and use a Phaser 3D plugin** (e.g. `phaser3-rex-plugins/Tap`, or the experimental `Phaser.Cameras.Sprite3D`). Rejected: these are not Phaser's core competency; community quality is uneven; we'd still be paying Phaser's ~220 KB on top.
+
+### Why a 3D rendering library at all (vs raw WebGL or another 3D lib)
+
+- **Decision**: Use Three.js (chosen above), not raw WebGL or a different abstraction.
+- **Rationale**:
+  - WebGL is a low-level API; building a minimum-viable lane runner directly on it would take weeks. A scene graph + camera + lighting + mesh primitives in 50 lines of Three.js would be hundreds of lines of WebGL shader + buffer setup.
+  - Three.js has the strongest community and documentation of any browser 3D library. GLTF model loading, post-processing, materials, lighting - all well-trodden ground.
+  - First-class TypeScript support (types ship in the package since 0.140-ish; no `@types/three` needed).
+  - Polygon.uy.sg (the user's reference design) uses Three.js, so any "how did they do X?" lookup translates directly.
+- **Alternatives considered**: Babylon.js (larger), PlayCanvas (heavyweight), raw WebGL (too much yak-shaving for the slice).
 
 ### Why Vite (not Webpack, esbuild-direct, or no-build)
 
@@ -66,44 +80,44 @@ The user is new to game dev. These are the genuinely surprising things web games
 
 ### G1. Delta-time-correct game loop
 
-- **Decision**: Use Phaser's built-in `Scene.update(time, delta)` for any per-frame math. Compute velocities and animation progress per `dtMs` (the delta argument), not per frame.
-- **Rationale**: A frame on a 144 Hz monitor is ~7 ms; on a struggling phone it can be 33 ms. Per-frame math means the game runs ~5x faster on the desktop. Phaser hands you the per-frame delta so this is just discipline, not implementation effort.
+- **Decision**: The `requestAnimationFrame` callback computes `dtMs = now - lastNow` and passes it to `tickPlayer(dtMs)` and `tickWorld(dtMs)`. Cap `dtMs` at 100 ms to avoid huge jumps after a long pause.
+- **Rationale**: A frame on a 144 Hz monitor is ~7 ms; on a struggling phone it can be 33 ms. Per-frame math means the game runs ~5x faster on the desktop. Three.js does NOT provide a managed loop (unlike Phaser); we own this and benefit from explicit control.
 - **Mitigation in code**: All "advance the world" calls take `dtMs` as their parameter (canonical name across the codebase per `contracts/module-contracts.md`). Asserted in unit tests with deterministic `dtMs` values.
 
 ### G2. Keyboard auto-repeat suppression
 
-- **Decision**: In `input-adapter`, treat only the *initial* keydown as input; ignore events where `KeyboardEvent.repeat === true`. Phaser's `JustDown` helper makes this trivial inside Scenes.
+- **Decision**: In `input-adapter`, treat only the *initial* keydown as input; ignore events where `KeyboardEvent.repeat === true`. Bridge in `src/game/game-loop.ts` reads `event.repeat` directly from the DOM event.
 - **Rationale**: Without this, holding the Right arrow walks the character right - left - right - left as fast as the OS repeats keys. Spec FR-006 explicitly forbids this.
 - **Mitigation in code**: `input-adapter` unit test asserts that an event stream of `{down repeat:false}, {down repeat:true}, {down repeat:true}` yields exactly one normalised InputEvent.
 
 ### G3. Touch event coalescing (no double-fire from pointer + touch)
 
-- **Decision**: Use Phaser's unified Pointer events (the `Input` plugin's `pointerdown`/`pointerup`) rather than mixing `mousedown`/`touchstart`. Apply a 50 ms debounce in `input-adapter` to coalesce same-direction inputs that arrive from different event sources within the window.
-- **Rationale**: On hybrid devices (Surface, Chromebook, iPad with mouse), a touch can fire both `touchend` and `mouseup` ~10-50 ms apart. Without coalescing, one swipe = two lane changes.
+- **Decision**: Use the DOM `pointerdown` / `pointerup` events (unified pointer events handle mouse + touch + pen). Apply a 50 ms debounce in `input-adapter` to coalesce same-direction inputs from different event sources.
+- **Rationale**: On hybrid devices (Surface, Chromebook, iPad with mouse), a touch can fire both `touchend` and `mouseup` ~10-50 ms apart. Without coalescing, one swipe = two lane changes. Pointer events unify these but the cross-source coalesce still helps when a player physically touches AND hits a key in the same intent.
 - **Mitigation in code**: `input-adapter` unit test asserts that two same-direction inputs within 50 ms produce one normalised event.
 
 ### G4. iOS audio unlock (reserved - audio is out of scope for this slice)
 
-- **Decision**: No audio in this slice; when audio is added (later slice), call `WebAudio.unlock()` (Phaser helper) on the first user gesture - tap, click, or key.
-- **Rationale**: iOS Safari refuses to play any audio until a user gesture has fired. Phaser handles this if you initialise the audio system inside an input handler.
-- **Mitigation in code**: Tracked in a TODO comment in `phaser-config.ts` referring back to this section; will become a real task in the audio slice.
+- **Decision**: No audio in this slice; when audio is added (later slice), use the WebAudio API or Howler.js and call `audioContext.resume()` (or equivalent) on the first user gesture - tap, click, or key.
+- **Rationale**: iOS Safari refuses to play any audio until a user gesture has fired. This is a browser-platform requirement that Three.js does not address (it has no built-in audio system); we own it directly.
+- **Mitigation in code**: Tracked in a TODO comment in `game/game-loop.ts` referring back to this section; will become a real task in the audio slice.
 
 ### G5. Scale management across 320 px - 4K screens
 
-- **Decision**: Phaser Game Config uses `scale: { mode: Scale.FIT, autoCenter: Scale.CENTER_BOTH, width: 720, height: 1280, parent: 'game' }`. The 720x1280 logical resolution gives a portrait-friendly mobile aspect ratio.
-- **Rationale**: `Scale.FIT` keeps the aspect ratio and adds letterboxing, which is acceptable for an endless runner. Logical coordinates stay the same regardless of device, so module code never asks the screen its size - the renderer maps logical -> screen.
-- **Mitigation in code**: All lane X-positions are expressed in logical units (e.g., lane centres at `x = 180, 360, 540` for a 720-wide logical canvas). Renderer asserts these are constant across resize events.
+- **Decision**: The canvas fills `100vw x 100vh`; a single `window.addEventListener('resize', ...)` handler updates `camera.aspect` and `renderer.setSize(width, height, false)`. Three.js's perspective camera uses field-of-view + aspect ratio, so the geometry stays correct on any viewport. Pixel ratio is set via `renderer.setPixelRatio(devicePixelRatio)` capped at 2 to avoid burning fill rate on retina displays.
+- **Rationale**: Unlike a 2D fixed-canvas game, a 3D scene is naturally resolution-independent; the camera FOV determines what fits on screen. World units (lane X, distance Z) stay the same regardless of device.
+- **Mitigation in code**: Lane X positions live in `shared/config.ts` as 3D world units (`{ left: -2, centre: 0, right: 2 }`). The renderer uses them directly.
 
 ### G6. Tab visibility / focus pause
 
-- **Decision**: Wire `document.visibilitychange` and `window.blur` to call `runner-engine.pause()`; resume on the next user gesture (key, click, tap). Phaser already pauses the game loop on tab hide, but we want our `runner-engine.distance` math to also stop accumulating.
-- **Rationale**: Spec FR-011 requires pause + resume overlay. Without this, a player who switches tabs sees their distance counter run while they weren't looking.
+- **Decision**: Wire `document.visibilitychange` and `window.blur` to call `runner-engine.pauseRun()`; require a user gesture (key, click, tap) to resume. The game loop short-circuits (returns early without ticking) when `isAwaitingResume === true`.
+- **Rationale**: Spec FR-011 requires pause + resume overlay. Three.js does NOT auto-pause when the tab is hidden, but `requestAnimationFrame` callbacks are throttled to ~once per second in background tabs by all major browsers - so without our explicit pause, distance would crawl forward, not freeze.
 - **Mitigation in code**: Integration test simulates a `visibilitychange` event and asserts `runner-engine.tick(1000)` does not advance distance while paused.
 
 ### G7. Window resize during a run
 
-- **Decision**: Phaser's Scale Manager emits a `resize` event; subscribe in `renderer` only. Game logic (lane positions in logical units) is unaffected.
-- **Rationale**: Mobile orientation changes and desktop window drags should not break the game.
+- **Decision**: `window.addEventListener('resize', ...)` calls `renderer.resize(window.innerWidth, window.innerHeight)`. The renderer recalculates camera aspect and renderer size; game logic is untouched.
+- **Rationale**: Mobile orientation changes and desktop window drags should not break the game. Three.js gives us the building blocks; we wire the listener ourselves.
 - **Mitigation in code**: Manual test in quickstart.md; no automated test (visual concern).
 
 ---
@@ -111,10 +125,10 @@ The user is new to game dev. These are the genuinely surprising things web games
 ## Module boundary enforcement
 
 - **Decision**: ESLint rule `no-restricted-imports` with these rules:
-  - `runner-engine/`, `input-adapter/`, `lane-state/`, `score/`, `question-bank/` MUST NOT import from `phaser` or from each other's internal files (only from each other's `index.ts`).
-  - `renderer/` and `phaser/` MAY import from `phaser`.
+  - `runner-engine/`, `input-adapter/`, `lane-state/`, `score/`, `question-bank/` MUST NOT import from `three` or from each other's internal files (only from each other's `index.ts`).
+  - `renderer/` and `game/` MAY import from `three`.
   - `shared/` MUST NOT import from any other module (it sits at the bottom of the dep graph).
-- **Rationale**: Encodes Constitution Principle III as a CI-enforceable rule, so a future "let me just import Phaser into lane-state real quick" change fails CI rather than slipping in.
+- **Rationale**: Encodes Constitution Principle III as a CI-enforceable rule, so a future "let me just import Three.js into lane-state real quick" change fails CI rather than slipping in. The Phaser->Three.js pivot validated this in practice - the same rule just had to swap one library name.
 - **Alternatives considered**:
   - **Pure convention.** Cheaper to set up; fails the moment two people work on the codebase or the original author forgets in two months. Rejected.
   - **Nx / TurboRepo workspace package boundaries.** Heavier; introduces a monorepo toolchain we don't need for this scale. Rejected for now.

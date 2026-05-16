@@ -8,16 +8,18 @@
 
 ## Summary
 
-Build the smallest playable web build of *The Real Geometry Dash*: a Phaser 3 game where the player runs forward at a constant speed along a three-lane track, switching lanes via keyboard (Arrow keys, A/D) or horizontal touch swipe. No gates, questions, scoring UI, or audio in this slice - just the runner foundation that every later slice will sit on. Delivered as a static web app hosted on Cloudflare Pages.
+Build the smallest playable web build of *The Real Geometry Dash*: a Three.js-rendered 3D lane runner where the player runs forward at a constant speed along a three-lane track, switching lanes via keyboard (Arrow keys, A/D) or horizontal touch swipe. No gates, questions, scoring UI, or audio in this slice - just the runner foundation that every later slice will sit on. Visual reference: polygon.uy.sg (low-poly, behind-the-player camera, DOM HUD over the WebGL canvas). Delivered as a static web app hosted on Cloudflare Pages.
 
-**Approach**: Phaser is the integration runtime (game loop, scene management, input plugin, scale manager, tweens). All game logic - lane state, input normalisation, runner engine, future scoring/question selection - lives in framework-agnostic TypeScript modules in `src/<module>/`. Phaser Scenes are thin glue: they read input events from `input-adapter`, drive transitions in `lane-state`, advance the world via `runner-engine`, and ask `renderer` to draw. Pure modules are unit-tested in Vitest without instantiating Phaser or a canvas. This honours Constitution Principle III (Library-First) without giving up Phaser's safety net.
+**Approach**: Three.js owns the 3D rendering (scene, perspective camera, WebGL renderer, lights, meshes). All game logic - lane state, input normalisation, runner engine, future scoring/question selection - lives in framework-agnostic TypeScript modules in `src/<module>/`. A thin `src/game/game-loop.ts` integration layer wires DOM events to `input-adapter`, drives transitions in `lane-state`, advances the world via `runner-engine`, and asks `renderer` to draw a frame using `requestAnimationFrame`. Pure modules are unit-tested in Vitest without instantiating Three.js or a canvas. The start screen and pause overlay are plain DOM elements layered on top of the canvas (matches polygon.uy.sg's pattern; HTML/CSS handles layout better than rendering UI inside WebGL).
+
+**Pivot note (2026-05-16 evening)**: This plan originally specified Phaser 3 (2D). After the 2D MVP shipped and passed acceptance, the user clarified they wanted a 3D look modelled on polygon.uy.sg. Because the constitution mandates Library-First (pure logic isolated from rendering), the swap only required replacing `src/renderer/` and `src/phaser/` with Three.js equivalents; the lane-state, runner-engine, and input-adapter modules and their 59 tests stayed untouched. See `research.md` §"Pivot from Phaser to Three.js" for the decision record.
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (`strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`)
 
 **Primary Dependencies**:
-- `phaser` ^3.85 (latest stable 3.x) - runtime/game framework
+- `three` ^0.170 (latest stable 0.17x) - 3D rendering library; ships its own TypeScript declarations
 - `vite` ^6 - dev server + production bundler
 - `typescript` ^5.x - type checker / compiler
 - `vitest` ^2 - unit/integration test runner
@@ -38,8 +40,8 @@ Build the smallest playable web build of *The Real Geometry Dash*: a Phaser 3 ga
 - No per-frame allocations in the run loop (constitution constraint)
 
 **Constraints**:
-- Critical JS budget: <= 500 KB gzipped (Phaser default ~220 KB gzipped + our code ~30 KB - well within budget)
-- Total assets: <= 5 MB (this slice has no art assets; placeholder shapes drawn from code)
+- Critical JS budget: <= 500 KB gzipped (Three.js core ~150 KB gzipped + our code ~30 KB - well within budget; lower than Phaser's ~220 KB)
+- Total assets: <= 5 MB (this slice has no art assets; player + track are Three.js primitives drawn from code)
 - Offline-playable after first load (no required network calls during a run)
 - Mobile-first input: must work without a hover or mouse cursor
 - Difficulty colour MUST be paired with a label/shape, not colour alone (constitution accessibility constraint - lives dormant in this slice until gates are added)
@@ -54,21 +56,21 @@ Evaluated against `.specify/memory/constitution.md` v1.0.0.
 
 ### Principle I - Simplicity & YAGNI
 
-- [x] **No speculative dependencies.** Only Phaser, Vite, TypeScript, and Vitest. Each is load-bearing for this slice or for the very next slice (gates/questions).
-- [x] **One new dependency that warrants justification: Phaser.** Rationale recorded in `research.md` under "Why Phaser, not vanilla canvas". Trade-off acknowledged: ~220 KB gzipped framework in exchange for built-in scene/input/tween/scale handling and reduced first-time-gamedev gotcha surface. Fits the 500 KB critical-JS budget with headroom.
+- [x] **No speculative dependencies.** Only Three.js, Vite, TypeScript, and Vitest. Each is load-bearing for this slice or for the very next slice (gates/questions).
+- [x] **One dependency that warrants justification: Three.js.** Rationale recorded in `research.md` under "Pivot from Phaser to Three.js" and "Why a 3D rendering library at all". Trade-off acknowledged: ~150 KB gzipped library in exchange for a maintained WebGL abstraction; without it we'd hand-roll a renderer at significant cost. Fits the 500 KB critical-JS budget with headroom.
 - [x] **No feature flags or speculative abstractions.** Score-submit interface is *reserved* (not created) - we describe its shape in research.md so we don't paint into a corner, but no code is added now.
 
 ### Principle II - Test-First Discipline
 
-- [x] **Game logic modules have unit-test entries in `tasks.md` ahead of implementation.** `lane-state`, `input-adapter`, `runner-engine` each get a `.test.ts` written first, asserted red, then made green.
-- [x] **Integration test for the cross-module flow.** A `tests/integration/lane-switch-flow.test.ts` covers: input event -> lane-state transition -> runner-engine tick -> renderer call dispatched. Wired in `/speckit-tasks` output.
-- [x] **Phaser Scenes are exempt from strict TDD** (renderer/visual code per constitution) but get a smoke test that asserts the boot scene mounts without errors.
+- [x] **Game logic modules have unit-test entries in `tasks.md` ahead of implementation.** `lane-state`, `input-adapter`, `runner-engine` each get a `.test.ts` written first, asserted red, then made green. (Already green - 59 tests passing.)
+- [x] **Integration test for the cross-module flow.** `tests/integration/lane-switch-flow.test.ts` covers: input event -> lane-state transition -> runner-engine tick -> renderer call dispatched. (Already passing.)
+- [x] **Three.js rendering and the game-loop integration are exempt from strict TDD** (renderer/visual code per constitution); they SHOULD have a smoke test if the test-runner can host WebGL. As with the Phaser-era plan, this is currently DEFERRED because jsdom cannot host WebGL and node-canvas requires Windows native build tools. Manual validation in T028/T036 covers scene mounting.
 
 ### Principle III - Library-First / Modular Design
 
 - [x] **Each subsystem is its own module folder** with a single public entrypoint (`src/lane-state/index.ts`, `src/input-adapter/index.ts`, etc.). See "Source Code" tree below.
-- [x] **Modules MUST NOT reach into each other's internals.** Enforced via TypeScript `index.ts` re-exports + an ESLint `no-restricted-imports` rule (added in tasks).
-- [x] **Pure-logic modules MUST run without DOM/canvas.** Tests run in Vitest's default `node` environment. The `renderer` module is the *only* module allowed to import from `phaser`; this is enforced by the same ESLint boundary rule.
+- [x] **Modules MUST NOT reach into each other's internals.** Enforced via TypeScript `index.ts` re-exports + an ESLint `no-restricted-imports` rule.
+- [x] **Pure-logic modules MUST run without DOM/canvas.** Tests run in Vitest's default `node` environment. **Only `src/renderer/` and `src/game/` may import from `three`**; this is enforced by the same ESLint boundary rule. The 2026-05-16 Phaser->Three.js pivot validated this principle in practice - 0 lines changed in `lane-state`, `runner-engine`, `input-adapter`, `swipe-detector`, or `shared`; 0 of 59 tests changed.
 - [x] **Shared types live in `src/shared/`** - never duplicated across modules.
 
 ### Principle IV - Observability & Debuggability
@@ -81,7 +83,7 @@ Evaluated against `.specify/memory/constitution.md` v1.0.0.
 ### Additional Constraints (Platform / Performance / Accessibility)
 
 - [x] Static web app, no required backend.
-- [x] Phaser Scale Manager configured to `Scale.FIT` mode with `Scale.CENTER_BOTH` for 320 px - 4K range.
+- [x] Three.js WebGLRenderer with `setPixelRatio(devicePixelRatio)` and a `window.resize` handler that updates the perspective camera aspect + renderer size. Canvas fills `100vw x 100vh`; DOM overlays sit at `position: fixed` above it.
 - [x] All input paths supported (keyboard + touch); difficulty-colour-with-label constraint is dormant in this slice (re-checked in the gates slice).
 
 **Result**: ✅ All gates pass on initial check. No Complexity Tracking entries required.
@@ -110,22 +112,18 @@ This slice establishes the project structure for the whole game. Modules listed 
 
 ```text
 geometry-dash/
-├── index.html                       # Phaser game host page (added)
+├── index.html                       # canvas host + DOM overlays (start, pause, debug) (added)
 ├── package.json                     # deps + scripts (added)
 ├── tsconfig.json                    # strict TS config (added)
 ├── vite.config.ts                   # Vite config (added)
 ├── vitest.config.ts                 # Vitest config (added)
-├── .eslintrc.cjs                    # boundary rules (added)
+├── eslint.config.js                 # flat config + boundary rules (added)
 ├── public/
 │   └── favicon.svg                  # placeholder favicon (added)
 ├── src/
-│   ├── main.ts                      # entrypoint: instantiates Phaser game + injects deps (added)
-│   ├── phaser/                      # Phaser integration layer (Scenes only)
-│   │   ├── phaser-config.ts         # game config: resolution, scale mode, physics: false (added)
-│   │   └── scenes/
-│   │       ├── boot-scene.ts        # placeholder; auto-advances to start (added)
-│   │       ├── start-scene.ts       # "press any key / tap to start" (added)
-│   │       └── run-scene.ts         # the actual running scene (added)
+│   ├── main.ts                      # entrypoint: wires DOM, creates game-loop (added)
+│   ├── game/                        # integration glue (was src/phaser/ pre-pivot)
+│   │   └── game-loop.ts             # owns scene state ('start' | 'running' | 'paused'); requestAnimationFrame loop; bridges DOM events to input-adapter; calls renderer per frame (added)
 │   ├── runner-engine/               # pure logic: distance, speed, paused state
 │   │   ├── index.ts                 # public API re-exports (added)
 │   │   ├── runner-engine.ts         # (added)
@@ -140,27 +138,28 @@ geometry-dash/
 │   │   ├── index.ts                 # (added)
 │   │   ├── lane-state.ts            # (added)
 │   │   └── lane-state.test.ts       # (added)
-│   ├── renderer/                    # ONLY module allowed to import from phaser
+│   ├── renderer/                    # ONLY module allowed to import from three
 │   │   ├── index.ts                 # (added)
-│   │   ├── runner-renderer.ts       # draws lanes + player rectangle (added)
-│   │   └── debug-overlay.ts         # ?debug=1 overlay (added)
+│   │   ├── three-renderer.ts        # scene + camera + lights + ground + lane dividers + scrolling rungs + player mesh; draw(player, world) updates per frame and calls renderer.render (added)
+│   │   └── debug-overlay.ts         # DOM-based ?debug=1 overlay (added)
 │   ├── score/                       # reserved for the scoring slice (NOT in this slice)
 │   ├── question-bank/               # reserved for the gates slice (NOT in this slice)
 │   └── shared/                      # types + constants
 │       ├── types.ts                 # Lane, Direction, InputEvent, AnimationState (added)
-│       └── config.ts                # tunables: lane count, swipe thresholds, debug flag (added)
+│       └── config.ts                # tunables: lane positions in world units, swipe thresholds, debug flag (added)
 └── tests/
     └── integration/
         └── lane-switch-flow.test.ts # cross-module flow test (added)
 ```
 
-**Structure Decision**: Single-project static web app. Modules co-locate their unit tests; cross-module integration tests live in `tests/integration/`. Reserved module folders (`score/`, `question-bank/`) are documented in the tree but NOT created until their respective slices, in line with Principle I (no speculative scaffolding).
+**Structure Decision**: Single-project static web app. Modules co-locate their unit tests; cross-module integration tests live in `tests/integration/`. Reserved module folders (`score/`, `question-bank/`) are documented in the tree but NOT created until their respective slices, in line with Principle I (no speculative scaffolding). Naming convention post-pivot: `src/game/` (was `src/phaser/`) for any code that depends on the rendering library's runtime, since it's no longer Phaser-specific.
 
 ## Phase 0 - Outline & Research
 
 See [research.md](./research.md). Key entries (no `NEEDS CLARIFICATION` markers remained from the spec; research focused on tech decisions and platform-gotcha mitigations):
 
-- **Why Phaser 3 over vanilla canvas** (decision + rationale + alternatives)
+- **Pivot from Phaser to Three.js** (decision + trigger + what changed)
+- **Why a 3D rendering library at all (vs raw WebGL or another 3D lib)**
 - **Why Vite, not Webpack/esbuild/no-build**
 - **Why Vitest, not Jest/Node test runner**
 - **TypeScript strictness profile** (which flags, why)
@@ -178,13 +177,13 @@ See [data-model.md](./data-model.md) and [contracts/module-contracts.md](./contr
 
 ## Post-Design Constitution Re-Check
 
-*Re-evaluated after Phase 1.*
+*Re-evaluated after Phase 1 and again after the 2026-05-16 Phaser->Three.js pivot.*
 
-- [x] Module boundaries declared in `contracts/module-contracts.md` keep Phaser confined to `renderer/` and `phaser/`. **Principle III holds.**
-- [x] Data model + state transitions are pure data; no Phaser types leak in. **Principle III holds.**
-- [x] Debug-overlay design lives in `renderer/`, gated by `?debug=1`. **Principle IV holds.**
+- [x] Module boundaries declared in `contracts/module-contracts.md` keep Three.js confined to `renderer/` and `game/`. **Principle III holds.**
+- [x] Data model + state transitions are pure data; no Three.js types leak in. **Principle III holds.**
+- [x] Debug-overlay design lives in `renderer/`, gated by `?debug=1` (DOM-based after the pivot). **Principle IV holds.**
 - [x] Quickstart describes `vitest run` as a precondition for any "implementation done" claim. **Principle II holds.**
-- [x] No new dependencies introduced during Phase 1 design beyond those declared in Technical Context. **Principle I holds.**
+- [x] No new dependencies introduced during Phase 1 design beyond those declared in Technical Context. The pivot SWAPPED `phaser` for `three` rather than adding to the dep list. **Principle I holds.**
 
 **Result**: ✅ Post-design re-check passes. Plan is ready to feed into `/speckit-tasks`.
 
