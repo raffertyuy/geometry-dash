@@ -41,3 +41,23 @@ export function tickWorld(world: WorldState, dtMs: number): WorldState {
     distanceUnits: world.distanceUnits + (dtMs * world.speedUnitsPerSec) / 1000,
   };
 }
+
+export function endRun(world: WorldState): WorldState {
+  if (world.runState !== 'running') return world;
+  console.debug({
+    event: 'run_ended',
+    tickMs: world.tickMs,
+    distanceUnits: world.distanceUnits,
+  });
+  return { ...world, runState: 'game-over' };
+}
+
+export function restartRun(world: WorldState): WorldState {
+  console.debug({ event: 'run_restarted' });
+  return {
+    runState: 'running',
+    speedUnitsPerSec: world.speedUnitsPerSec,
+    distanceUnits: 0,
+    tickMs: 0,
+  };
+}

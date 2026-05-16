@@ -6,14 +6,22 @@ import {
 } from '../../src/lane-state';
 import {
   createWorldState,
+  endRun,
   pauseRun,
+  restartRun,
   resumeRun,
   startRun,
   tickWorld,
 } from '../../src/runner-engine';
 import { createInputAdapter } from '../../src/input-adapter';
 import { computeScore } from '../../src/score';
-import type { InputEvent, PlayerState, WorldState } from '../../src/shared/types';
+import { collidesAt } from '../../src/obstacles';
+import type {
+  InputEvent,
+  ObstacleGroup,
+  PlayerState,
+  WorldState,
+} from '../../src/shared/types';
 import { RUN_SPEED_UNITS_PER_SEC } from '../../src/shared/config';
 
 describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () => {
@@ -118,6 +126,62 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     world = resumeRun(world);
     world = tickWorld(world, 600); // another 6 score points
     expect(computeScore(world.tickMs)).toBe(40);
+  });
+
+  it('obstacle reaches player in blocked lane: collides, run ends, restart resets state', () => {
+    let player: PlayerState = createPlayerState();
+    let world: WorldState = startRun(createWorldState());
+
+    // Place an obstacle that blocks the centre lane just ahead of the player.
+    let obstacle: ObstacleGroup = {
+      id: 1,
+      variant: 'cube',
+      blockedLanes: ['centre'],
+      worldZ: -5,
+      previousWorldZ: -5,
+    };
+
+    // Run for a few hundred ms to accumulate some score.
+    world = tickWorld(world, 3000);
+    expect(computeScore(world.tickMs)).toBe(30);
+
+    // Scroll the obstacle toward the player frame by frame until it crosses 0.
+    let collided = false;
+    for (let i = 0; i < 200; i++) {
+      const dt = 16;
+      world = tickWorld(world, dt);
+      const delta = (dt * world.speedUnitsPerSec) / 1000;
+      obstacle = {
+        ...obstacle,
+        previousWorldZ: obstacle.worldZ,
+        worldZ: obstacle.worldZ + delta,
+      };
+      if (collidesAt(player, obstacle)) {
+        collided = true;
+        break;
+      }
+    }
+    expect(collided).toBe(true);
+
+    // End the run.
+    world = endRun(world);
+    expect(world.runState).toBe('game-over');
+
+    // Verify the score and tickMs are frozen at the collision moment.
+    const distAtEnd = world.distanceUnits;
+    const tickAtEnd = world.tickMs;
+    world = tickWorld(world, 10000); // big delta while in game-over
+    expect(world.distanceUnits).toBe(distAtEnd);
+    expect(world.tickMs).toBe(tickAtEnd);
+
+    // Restart: fresh state, zero score, zero timer, still running.
+    world = restartRun(world);
+    player = createPlayerState();
+    expect(world.runState).toBe('running');
+    expect(world.distanceUnits).toBe(0);
+    expect(world.tickMs).toBe(0);
+    expect(computeScore(world.tickMs)).toBe(0);
+    expect(player.currentLane).toBe('centre');
   });
 
   it('a touch swipe drives the same end-to-end effect as a keyboard input', () => {

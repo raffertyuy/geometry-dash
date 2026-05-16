@@ -134,6 +134,30 @@
         flex: 0 0 4ch;
         order: 1;
       }
+
+      .game-over-stat {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(1.6rem, 5vw, 2.6rem);
+        font-weight: 700;
+        margin: 0 0 0.6em 0;
+        letter-spacing: 0.04em;
+      }
+
+      #game-over-score {
+        color: #ff8a30;
+      }
+
+      #game-over-timer {
+        color: #18c8ff;
+      }
+
+      .hud-label {
+        font-size: clamp(0.85rem, 1.8vw, 1.0rem);
+        color: #9090a0;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        margin: 0 0 0.2em 0;
+      }
     </style>
   </head>
   <body>
@@ -154,6 +178,15 @@ Swipe left or right on mobile</p>
     <div id="hud">
       <div id="timer">0:00</div>
       <div id="score">0</div>
+    </div>
+
+    <div id="game-over-overlay" class="overlay hidden">
+      <h1>Game Over</h1>
+      <p class="hud-label">Score</p>
+      <p class="game-over-stat" id="game-over-score">0</p>
+      <p class="hud-label">Time</p>
+      <p class="game-over-stat" id="game-over-timer">0:00</p>
+      <p class="hint">Tap or press any key to play again</p>
     </div>
 
     <div id="debug-overlay" class="hidden"></div>

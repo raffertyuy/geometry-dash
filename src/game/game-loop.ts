@@ -1,8 +1,16 @@
 import { createInputAdapter, type InputAdapter } from '../input-adapter';
 import { applyInput, createPlayerState, tickPlayer } from '../lane-state';
 import {
+  collidesAt,
+  createSpawnSchedule,
+  nextObstacleGroup,
+  type ObstacleSpawnSchedule,
+} from '../obstacles';
+import {
   createWorldState,
+  endRun,
   pauseRun,
+  restartRun,
   resumeRun,
   startRun,
   tickWorld,
@@ -14,9 +22,15 @@ import {
   type ThreeRenderer,
 } from '../renderer';
 import { computeScore, formatScore, formatTimer } from '../score';
-import type { InputEvent, PlayerState, WorldState } from '../shared/types';
+import type {
+  InputEvent,
+  ObstacleGroup,
+  PlayerState,
+  WorldState,
+} from '../shared/types';
 
 const MAX_FRAME_DT_MS = 100;
+const OBSTACLE_CULL_Z = 14; // anything past z=14 has scrolled behind the camera
 
 export interface GameLoopHostElements {
   readonly canvas: HTMLCanvasElement;
@@ -25,13 +39,20 @@ export interface GameLoopHostElements {
   readonly debugOverlay: HTMLElement;
   readonly score: HTMLElement;
   readonly timer: HTMLElement;
+  readonly gameOverOverlay: HTMLElement;
+  readonly gameOverScore: HTMLElement;
+  readonly gameOverTimer: HTMLElement;
 }
 
 export interface GameLoopHandles {
   dispose(): void;
 }
 
-type LoopState = 'start-screen' | 'running' | 'paused';
+type LoopState = 'start-screen' | 'running' | 'paused' | 'game-over';
+
+function freshSeed(): number {
+  return (performance.now() * 1000) ^ 0x9e3779b9;
+}
 
 export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   let player: PlayerState = createPlayerState();
@@ -39,6 +60,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   let lastInput: InputEvent | undefined;
   let loopState: LoopState = 'start-screen';
   let isAwaitingResume = false;
+  let isAwaitingRestart = false;
+  let obstacles: ObstacleGroup[] = [];
+  let spawnSchedule: ObstacleSpawnSchedule = createSpawnSchedule(freshSeed());
 
   const adapter: InputAdapter = createInputAdapter({
     now: () => performance.now(),
@@ -59,10 +83,34 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     host.pauseOverlay.classList.toggle('hidden', !visible);
   }
 
+  function showGameOverOverlay(visible: boolean): void {
+    host.gameOverOverlay.classList.toggle('hidden', !visible);
+  }
+
   function beginRun(): void {
     loopState = 'running';
     world = startRun(world);
     showStartScreen(false);
+  }
+
+  function triggerGameOver(): void {
+    world = endRun(world);
+    loopState = 'game-over';
+    isAwaitingRestart = true;
+    host.gameOverScore.textContent = formatScore(computeScore(world.tickMs));
+    host.gameOverTimer.textContent = formatTimer(world.tickMs);
+    showGameOverOverlay(true);
+  }
+
+  function restartFromInput(): void {
+    world = restartRun(world);
+    player = createPlayerState();
+    obstacles = [];
+    spawnSchedule = createSpawnSchedule(freshSeed());
+    lastInput = undefined;
+    loopState = 'running';
+    isAwaitingRestart = false;
+    showGameOverOverlay(false);
   }
 
   function pauseFromBlur(): void {
@@ -92,6 +140,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
       beginRun();
       return; // do not also drive lane-state with the press that started the run
     }
+    if (isAwaitingRestart) {
+      restartFromInput();
+      return; // consumed; no lane change
+    }
     if (isAwaitingResume) {
       resumeFromInput();
       return;
@@ -104,6 +156,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
       beginRun();
       return;
     }
+    if (isAwaitingRestart) {
+      restartFromInput();
+      return;
+    }
     if (isAwaitingResume) {
       resumeFromInput();
       return;
@@ -112,7 +168,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   }
 
   function onPointerUp(event: PointerEvent): void {
-    if (isAwaitingResume || loopState !== 'running') return;
+    if (isAwaitingResume || isAwaitingRestart || loopState !== 'running') return;
     adapter.handlePointerUp(event.clientX, event.clientY);
   }
 
@@ -148,9 +204,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // may differ from CSS size until the first resize call).
   renderer.resize(window.innerWidth, window.innerHeight);
 
-  // Ensure start screen is visible up-front, pause overlay hidden.
+  // Ensure start screen is visible up-front, other overlays hidden.
   showStartScreen(true);
   showPauseOverlay(false);
+  showGameOverOverlay(false);
 
   // ---- rAF loop ----
 
@@ -168,9 +225,41 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
 
     if (loopState === 'running' && !isAwaitingResume) {
       player = tickPlayer(player, dtMs);
+      const previousDistance = world.distanceUnits;
       world = tickWorld(world, dtMs);
+      const distanceDelta = world.distanceUnits - previousDistance;
+
+      // Advance each obstacle's worldZ; track previousWorldZ for collision.
+      for (const obstacle of obstacles) {
+        obstacle.previousWorldZ = obstacle.worldZ;
+        obstacle.worldZ += distanceDelta;
+      }
+
+      // Collision check on the nearest unpassed group (the one with the
+      // smallest non-negative worldZ that just crossed, or any candidate).
+      for (const obstacle of obstacles) {
+        if (collidesAt(player, obstacle)) {
+          triggerGameOver();
+          break;
+        }
+      }
+
+      // Spawn the next obstacle group whenever the player has run past the
+      // schedule's next-distance marker.
+      while (
+        loopState === 'running' &&
+        world.distanceUnits >= spawnSchedule.nextSpawnDistance
+      ) {
+        const result = nextObstacleGroup(spawnSchedule);
+        obstacles.push(result.group);
+        spawnSchedule = result.schedule;
+      }
+
+      // Cull obstacles that have scrolled behind the camera.
+      obstacles = obstacles.filter((o) => o.worldZ <= OBSTACLE_CULL_Z);
     }
 
+    renderer.updateObstacles(obstacles);
     renderer.draw(player, world);
     debugOverlay.update(player, world, lastInput);
     host.score.textContent = formatScore(computeScore(world.tickMs));

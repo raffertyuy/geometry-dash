@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   createWorldState,
+  endRun,
   pauseRun,
+  restartRun,
   resumeRun,
   startRun,
   tickWorld,
@@ -107,6 +109,77 @@ describe('tickWorld', () => {
       w = tickWorld(w, 1); // 1ms ticks for 1 second total
     }
     expect(w.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC, 3);
+    expect(w.tickMs).toBe(1000);
+  });
+
+  it('does not advance distance from game-over state', () => {
+    let w = startRun(createWorldState());
+    w = tickWorld(w, 500);
+    const distAtEnd = w.distanceUnits;
+    const tickAtEnd = w.tickMs;
+    w = endRun(w);
+    w = tickWorld(w, 1000);
+    expect(w.distanceUnits).toBe(distAtEnd);
+    expect(w.tickMs).toBe(tickAtEnd);
+  });
+});
+
+describe('endRun', () => {
+  it('transitions running to game-over', () => {
+    const w = startRun(createWorldState());
+    expect(endRun(w).runState).toBe('game-over');
+  });
+
+  it('is a no-op from pre-run', () => {
+    const w = createWorldState();
+    expect(endRun(w)).toEqual(w);
+  });
+
+  it('is a no-op from paused', () => {
+    const w = pauseRun(startRun(createWorldState()));
+    expect(endRun(w).runState).toBe('paused');
+  });
+
+  it('is idempotent (a second endRun on a game-over world is a no-op)', () => {
+    const w = endRun(startRun(createWorldState()));
+    expect(endRun(w).runState).toBe('game-over');
+  });
+
+  it('preserves accumulated tickMs and distanceUnits at the moment of end', () => {
+    let w = startRun(createWorldState());
+    w = tickWorld(w, 1234);
+    const distBefore = w.distanceUnits;
+    const tickBefore = w.tickMs;
+    w = endRun(w);
+    expect(w.distanceUnits).toBe(distBefore);
+    expect(w.tickMs).toBe(tickBefore);
+  });
+});
+
+describe('restartRun', () => {
+  it('returns a fresh running state with zero distance and zero tickMs', () => {
+    let w = startRun(createWorldState());
+    w = tickWorld(w, 5000);
+    w = endRun(w);
+    const restarted = restartRun(w);
+    expect(restarted.runState).toBe('running');
+    expect(restarted.distanceUnits).toBe(0);
+    expect(restarted.tickMs).toBe(0);
+  });
+
+  it('preserves speedUnitsPerSec', () => {
+    let w = startRun(createWorldState());
+    w = endRun(w);
+    expect(restartRun(w).speedUnitsPerSec).toBe(w.speedUnitsPerSec);
+  });
+
+  it('a tickWorld after restart re-starts distance accumulation from zero', () => {
+    let w = startRun(createWorldState());
+    w = tickWorld(w, 2000);
+    w = endRun(w);
+    w = restartRun(w);
+    w = tickWorld(w, 1000);
+    expect(w.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC, 5);
     expect(w.tickMs).toBe(1000);
   });
 });

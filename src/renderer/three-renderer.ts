@@ -4,7 +4,12 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { easeOutCubic } from '../lane-state';
 import { LANE_X } from '../shared/config';
-import type { PlayerState, WorldState } from '../shared/types';
+import type {
+  ObstacleGroup,
+  ObstacleVariantId,
+  PlayerState,
+  WorldState,
+} from '../shared/types';
 
 // ---- Tron palette --------------------------------------------------------
 
@@ -18,6 +23,8 @@ const COL_PLAYER_BODY = 0x110804;
 // Note: the trail's amber colour is decomposed into TRAIL_R/G/B below for
 // per-vertex fade in the Line2 vertex-colour buffer.
 const COL_SPEED_LINE = 0x8ad0ff;
+const COL_OBSTACLE = 0xff3aa0; // emissive magenta - distinct from amber runner + cyan grid
+const COL_OBSTACLE_BODY = 0x2a0817;
 
 // ---- Scene geometry ------------------------------------------------------
 
@@ -64,8 +71,19 @@ const TRAIL_B = 0x30 / 0xff;
 export interface ThreeRenderer {
   draw(player: PlayerState, world: WorldState): void;
   resize(widthPx: number, heightPx: number): void;
+  updateObstacles(groups: readonly ObstacleGroup[]): void;
   destroy(): void;
 }
+
+const OBSTACLE_POOL_SIZE = 12;
+const OBSTACLE_HEIGHTS: Readonly<Record<ObstacleVariantId, number>> = {
+  cube: 1.4,
+  pillar: 2.6,
+  cylinder: 1.6,
+  sphere: 1.6,
+  'trapezoid-prism': 1.6,
+  'wide-bar': 1.2,
+};
 
 interface SpeedLine {
   readonly mesh: THREE.Mesh;
@@ -309,6 +327,114 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   player.position.set(LANE_X.centre, 0, 0);
   scene.add(player);
 
+  // ---- Obstacle mesh pool ----------------------------------------------
+
+  const obstacleMaterial = new THREE.MeshStandardMaterial({
+    color: COL_OBSTACLE_BODY,
+    emissive: COL_OBSTACLE,
+    emissiveIntensity: 0.7,
+    roughness: 0.3,
+    metalness: 0.4,
+    toneMapped: false,
+  });
+
+  function createTrapezoidGeometry(): THREE.BufferGeometry {
+    const halfDepth = 0.5;
+    const positions = new Float32Array([
+      // bottom: y=0, x=±0.7 (wider)
+      -0.7, 0, -halfDepth,
+       0.7, 0, -halfDepth,
+       0.7, 0,  halfDepth,
+      -0.7, 0,  halfDepth,
+      // top: y=1.6, x=±0.5 (narrower)
+      -0.5, 1.6, -halfDepth,
+       0.5, 1.6, -halfDepth,
+       0.5, 1.6,  halfDepth,
+      -0.5, 1.6,  halfDepth,
+    ]);
+    const indices = new Uint16Array([
+      // bottom
+      0, 2, 1, 0, 3, 2,
+      // top
+      4, 5, 6, 4, 6, 7,
+      // front
+      3, 2, 6, 3, 6, 7,
+      // back
+      0, 1, 5, 0, 5, 4,
+      // left (slanted)
+      0, 4, 7, 0, 7, 3,
+      // right (slanted)
+      1, 2, 6, 1, 6, 5,
+    ]);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    geometry.computeVertexNormals();
+    // Recenter Y so the geometry's pivot is at its base (already y=0 base, fine).
+    return geometry;
+  }
+
+  const obstacleGeometries: Readonly<Record<ObstacleVariantId, THREE.BufferGeometry>> = {
+    cube: new THREE.BoxGeometry(1.4, 1.4, 1.4),
+    pillar: new THREE.BoxGeometry(1.0, 2.6, 1.0),
+    cylinder: new THREE.CylinderGeometry(0.7, 0.7, 1.6, 16),
+    sphere: new THREE.SphereGeometry(0.8, 24, 16),
+    'trapezoid-prism': createTrapezoidGeometry(),
+    'wide-bar': new THREE.BoxGeometry(4.0, 1.2, 1.0),
+  };
+
+  const obstaclePool: Map<ObstacleVariantId, THREE.Mesh[]> = new Map();
+  for (const variantId of Object.keys(obstacleGeometries) as ObstacleVariantId[]) {
+    const meshes: THREE.Mesh[] = [];
+    for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
+      const mesh = new THREE.Mesh(obstacleGeometries[variantId], obstacleMaterial);
+      mesh.visible = false;
+      scene.add(mesh);
+      meshes.push(mesh);
+    }
+    obstaclePool.set(variantId, meshes);
+  }
+
+  function updateObstacles(groups: readonly ObstacleGroup[]): void {
+    // Walk each variant's pool, assigning visible meshes to active groups.
+    const usage = new Map<ObstacleVariantId, number>();
+    for (const variantId of obstaclePool.keys()) usage.set(variantId, 0);
+
+    for (const group of groups) {
+      const pool = obstaclePool.get(group.variant);
+      if (!pool) continue;
+      const used = usage.get(group.variant)!;
+      if (used >= pool.length) continue; // pool exhausted (shouldn't normally happen)
+      const mesh = pool[used]!;
+      usage.set(group.variant, used + 1);
+
+      let xPos: number;
+      if (group.blockedLanes.length === 1) {
+        xPos = LANE_X[group.blockedLanes[0]!];
+      } else {
+        const x0 = LANE_X[group.blockedLanes[0]!];
+        const x1 = LANE_X[group.blockedLanes[1]!];
+        xPos = (x0 + x1) / 2;
+      }
+      // Trapezoid prism's geometry has its base at y=0 already, so offset by 0.
+      // For all other shapes, the centre is at the centre of the box/sphere.
+      const variantHeight = OBSTACLE_HEIGHTS[group.variant];
+      const yPos =
+        group.variant === 'trapezoid-prism' ? 0 : variantHeight / 2;
+
+      mesh.position.set(xPos, yPos, group.worldZ);
+      mesh.visible = true;
+    }
+
+    // Hide any pool slots not used this frame.
+    for (const [variantId, pool] of obstaclePool) {
+      const used = usage.get(variantId)!;
+      for (let i = used; i < pool.length; i++) {
+        pool[i]!.visible = false;
+      }
+    }
+  }
+
   // ---- Light trail behind the runner -----------------------------------
 
   const trailPositions = new Float32Array(TRAIL_MAX_POINTS * 2 * 3);
@@ -485,5 +611,5 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     });
   }
 
-  return { draw, resize, destroy };
+  return { draw, resize, updateObstacles, destroy };
 }

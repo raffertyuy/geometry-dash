@@ -25,6 +25,14 @@ export const SWIPE_MAX_DURATION_MS = 500;
 export const SWIPE_HORIZONTAL_DOMINANCE = 2;
 export const INPUT_COALESCE_WINDOW_MS = 50;
 
+// Obstacle tunables. Distances are in world units; OBSTACLES_INITIAL_SPAWN_Z
+// places the first obstacle ~1.4 s of running ahead of the player at the
+// current RUN_SPEED_UNITS_PER_SEC.
+export const OBSTACLES_MIN_GAP = 22;
+export const OBSTACLES_MAX_GAP = 50;
+export const OBSTACLES_INITIAL_SPAWN_Z = -34;
+export const OBSTACLES_SINGLE_LANE_PROBABILITY = 0.8;
+
 function readDebugFlag(): boolean {
   if (typeof window === 'undefined') return false;
   try {
