@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { easeOutCubic } from '../lane-state';
 import { LANE_X } from '../shared/config';
 import type { PlayerState, WorldState } from '../shared/types';
@@ -15,7 +18,8 @@ const COL_HORIZON = 0x18a8ff;
 const COL_SUN = 0xff3aa0; // small magenta sun disc, dimmer than before
 const COL_PLAYER = 0xff8a30; // amber - the runner's "user" colour, contrasts with cyan grid
 const COL_PLAYER_BODY = 0x110804;
-const COL_TRAIL = 0xff8a30;
+// Note: the trail's amber colour is decomposed into TRAIL_R/G/B below for
+// per-vertex fade in the Line2 vertex-colour buffer.
 const COL_SPEED_LINE = 0x8ad0ff;
 
 // ---- Scene geometry ------------------------------------------------------
@@ -46,10 +50,14 @@ const PLAYER_HEAD_Y = 1.42;
 const PLAYER_SHOULDER_X = 0.26;
 const PLAYER_HIP_X = 0.11;
 
-// Trail
-const TRAIL_LENGTH = 16; // number of segments
-const TRAIL_SPACING = 0.45; // world units between segments
-const TRAIL_MAX_OPACITY = 0.85;
+// Trail (thin laser line behind the runner, Tron lightcycle style)
+const TRAIL_POINT_COUNT = 28; // path points; (N-1) line segments
+const TRAIL_SPACING = 0.32; // world units between deposit points
+const TRAIL_PIXEL_WIDTH = 4; // line thickness in screen pixels
+// COL_TRAIL (0xff8a30) decomposed for vertex-color fade
+const TRAIL_R = 1.0;
+const TRAIL_G = 0x8a / 0xff;
+const TRAIL_B = 0x30 / 0xff;
 
 export interface ThreeRenderer {
   draw(player: PlayerState, world: WorldState): void;
@@ -301,28 +309,30 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
 
   // ---- Light trail behind the runner -----------------------------------
 
-  // Each frame, a new segment is conceptually deposited at the player's
-  // current X every TRAIL_SPACING world units of distance travelled. The
-  // segments then drift backward (toward and past the camera) as the
-  // world scrolls. Captures lane-change kinks in the trail.
-  const trailMeshes: THREE.Mesh[] = [];
-  for (let i = 0; i < TRAIL_LENGTH; i++) {
-    const opacity = (1 - i / TRAIL_LENGTH) * TRAIL_MAX_OPACITY;
-    const mat = new THREE.MeshBasicMaterial({
-      color: COL_TRAIL,
-      transparent: true,
-      opacity,
-      toneMapped: false,
-    });
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, 0.06, TRAIL_SPACING * 0.85),
-      mat,
-    );
-    mesh.visible = false;
-    scene.add(mesh);
-    trailMeshes.push(mesh);
-  }
+  // A continuous thin glowing line behind the runner, built from a Line2
+  // (Three.js's thick-line addon). Each frame a new path point is
+  // conceptually deposited at the player's current X every TRAIL_SPACING
+  // world units of distance travelled. Older points drift backward (toward
+  // and past the camera) as the world scrolls. Lane changes produce kinks
+  // in the line at the X where they happened.
+  const trailGeometry = new LineGeometry();
+  const trailMaterial = new LineMaterial({
+    color: 0xffffff, // tinted by vertex colors
+    linewidth: TRAIL_PIXEL_WIDTH,
+    vertexColors: true,
+    transparent: true,
+    worldUnits: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  trailMaterial.resolution.set(canvas.clientWidth, canvas.clientHeight);
+  const trailLine = new Line2(trailGeometry, trailMaterial);
+  trailLine.visible = false;
+  scene.add(trailLine);
+
   const trailXBuffer: number[] = [];
+  const trailPositions: number[] = [];
+  const trailColors: number[] = [];
   let distanceSinceLastTrailDeposit = 0;
 
   // ---- Draw loop -------------------------------------------------------
@@ -368,27 +378,46 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
       }
     }
 
-    // Light trail: deposit a fresh X every TRAIL_SPACING units travelled.
+    // Light trail: deposit a fresh path point every TRAIL_SPACING units
+    // travelled, then rebuild the Line2's vertex buffer.
     distanceSinceLastTrailDeposit += distanceDelta;
     while (distanceSinceLastTrailDeposit >= TRAIL_SPACING) {
       trailXBuffer.unshift(player.position.x);
-      if (trailXBuffer.length > TRAIL_LENGTH) {
-        trailXBuffer.length = TRAIL_LENGTH;
+      if (trailXBuffer.length > TRAIL_POINT_COUNT) {
+        trailXBuffer.length = TRAIL_POINT_COUNT;
       }
       distanceSinceLastTrailDeposit -= TRAIL_SPACING;
     }
-    for (let i = 0; i < TRAIL_LENGTH; i++) {
-      const mesh = trailMeshes[i]!;
-      const x = trailXBuffer[i];
-      if (x === undefined) {
-        mesh.visible = false;
-        continue;
-      }
-      mesh.visible = true;
-      mesh.position.x = x;
-      mesh.position.y = 0.05;
-      mesh.position.z =
-        (i + 1) * TRAIL_SPACING + distanceSinceLastTrailDeposit;
+
+    // Build positions and colors arrays.
+    trailPositions.length = 0;
+    trailColors.length = 0;
+
+    // First point: the player's current position (the line emerges from
+    // exactly underneath the runner).
+    trailPositions.push(player.position.x, 0.06, 0);
+    trailColors.push(TRAIL_R, TRAIL_G, TRAIL_B);
+
+    const bufLen = trailXBuffer.length;
+    for (let i = 0; i < bufLen; i++) {
+      const x = trailXBuffer[i] ?? player.position.x;
+      const z = i * TRAIL_SPACING + distanceSinceLastTrailDeposit;
+      trailPositions.push(x, 0.06, z);
+      // Fade by darkening the RGB toward the tail; bloom then drops off
+      // naturally as the brightness falls below the bloom threshold.
+      const t = (i + 1) / (bufLen + 1);
+      const k = Math.pow(1 - t, 1.3);
+      trailColors.push(TRAIL_R * k, TRAIL_G * k, TRAIL_B * k);
+    }
+
+    if (trailPositions.length >= 6) {
+      // At least 2 points = drawable line segment.
+      trailGeometry.setPositions(trailPositions);
+      trailGeometry.setColors(trailColors);
+      trailLine.computeLineDistances();
+      trailLine.visible = true;
+    } else {
+      trailLine.visible = false;
     }
 
     composer.render();
@@ -400,6 +429,7 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     renderer.setSize(widthPx, heightPx, false);
     composer.setSize(widthPx, heightPx);
     bloom.resolution.set(widthPx, heightPx);
+    trailMaterial.resolution.set(widthPx, heightPx);
   }
 
   function destroy(): void {
