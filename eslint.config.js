@@ -8,6 +8,14 @@ export default tseslint.config(
     files: ['src/**/*.ts', 'tests/**/*.ts'],
     extends: [...tseslint.configs.recommended],
     rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-restricted-imports': [
         'error',
         {
