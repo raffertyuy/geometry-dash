@@ -2,9 +2,6 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { Line2 } from 'three/addons/lines/Line2.js';
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { easeOutCubic } from '../lane-state';
 import { LANE_X } from '../shared/config';
 import type { PlayerState, WorldState } from '../shared/types';
@@ -50,11 +47,16 @@ const PLAYER_HEAD_Y = 1.42;
 const PLAYER_SHOULDER_X = 0.26;
 const PLAYER_HIP_X = 0.11;
 
-// Trail (thin laser line behind the runner, Tron lightcycle style)
-const TRAIL_POINT_COUNT = 28; // path points; (N-1) line segments
-const TRAIL_SPACING = 0.32; // world units between deposit points
-const TRAIL_PIXEL_WIDTH = 4; // line thickness in screen pixels
-// COL_TRAIL (0xff8a30) decomposed for vertex-color fade
+// Trail (continuous thin glowing strip behind the runner, Tron lightcycle
+// style). Built as a hand-rolled indexed BufferGeometry quad strip: each
+// path point produces two vertices (left + right of the trail's centreline),
+// adjacent path points are connected by two triangles forming a quad. The
+// whole strip is one Mesh, so the visual is gap-free regardless of camera
+// distance.
+const TRAIL_MAX_POINTS = 32; // 1 player position + up to 31 buffered samples
+const TRAIL_SPACING = 0.3; // world units between deposit samples
+const TRAIL_HALF_WIDTH = 0.11; // half the trail's lateral width in world units
+// COL_TRAIL (0xff8a30) decomposed for vertex-colour fade
 const TRAIL_R = 1.0;
 const TRAIL_G = 0x8a / 0xff;
 const TRAIL_B = 0x30 / 0xff;
@@ -309,30 +311,46 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
 
   // ---- Light trail behind the runner -----------------------------------
 
-  // A continuous thin glowing line behind the runner, built from a Line2
-  // (Three.js's thick-line addon). Each frame a new path point is
-  // conceptually deposited at the player's current X every TRAIL_SPACING
-  // world units of distance travelled. Older points drift backward (toward
-  // and past the camera) as the world scrolls. Lane changes produce kinks
-  // in the line at the X where they happened.
-  const trailGeometry = new LineGeometry();
-  const trailMaterial = new LineMaterial({
-    color: 0xffffff, // tinted by vertex colors
-    linewidth: TRAIL_PIXEL_WIDTH,
+  const trailPositions = new Float32Array(TRAIL_MAX_POINTS * 2 * 3);
+  const trailColors = new Float32Array(TRAIL_MAX_POINTS * 2 * 3);
+  // Pre-fill the index buffer: (N-1) quads connecting adjacent path points.
+  const trailIndices = new Uint16Array((TRAIL_MAX_POINTS - 1) * 6);
+  for (let i = 0; i < TRAIL_MAX_POINTS - 1; i++) {
+    const a = i * 2;
+    const b = i * 2 + 1;
+    const c = (i + 1) * 2;
+    const d = (i + 1) * 2 + 1;
+    const base = i * 6;
+    trailIndices[base + 0] = a;
+    trailIndices[base + 1] = b;
+    trailIndices[base + 2] = c;
+    trailIndices[base + 3] = b;
+    trailIndices[base + 4] = d;
+    trailIndices[base + 5] = c;
+  }
+
+  const trailPositionAttribute = new THREE.BufferAttribute(trailPositions, 3);
+  trailPositionAttribute.setUsage(THREE.DynamicDrawUsage);
+  const trailColorAttribute = new THREE.BufferAttribute(trailColors, 3);
+  trailColorAttribute.setUsage(THREE.DynamicDrawUsage);
+
+  const trailGeometry = new THREE.BufferGeometry();
+  trailGeometry.setAttribute('position', trailPositionAttribute);
+  trailGeometry.setAttribute('color', trailColorAttribute);
+  trailGeometry.setIndex(new THREE.BufferAttribute(trailIndices, 1));
+  trailGeometry.setDrawRange(0, 0);
+
+  const trailMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true,
     transparent: true,
-    worldUnits: false,
+    side: THREE.DoubleSide,
     depthWrite: false,
     toneMapped: false,
   });
-  trailMaterial.resolution.set(canvas.clientWidth, canvas.clientHeight);
-  const trailLine = new Line2(trailGeometry, trailMaterial);
-  trailLine.visible = false;
-  scene.add(trailLine);
+  const trailMesh = new THREE.Mesh(trailGeometry, trailMaterial);
+  scene.add(trailMesh);
 
   const trailXBuffer: number[] = [];
-  const trailPositions: number[] = [];
-  const trailColors: number[] = [];
   let distanceSinceLastTrailDeposit = 0;
 
   // ---- Draw loop -------------------------------------------------------
@@ -379,46 +397,66 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     }
 
     // Light trail: deposit a fresh path point every TRAIL_SPACING units
-    // travelled, then rebuild the Line2's vertex buffer.
+    // travelled, then rewrite the quad-strip vertex buffer in place.
     distanceSinceLastTrailDeposit += distanceDelta;
     while (distanceSinceLastTrailDeposit >= TRAIL_SPACING) {
       trailXBuffer.unshift(player.position.x);
-      if (trailXBuffer.length > TRAIL_POINT_COUNT) {
-        trailXBuffer.length = TRAIL_POINT_COUNT;
+      // The buffer holds at most (TRAIL_MAX_POINTS - 1) entries because the
+      // first path point is always the player's current position.
+      if (trailXBuffer.length > TRAIL_MAX_POINTS - 1) {
+        trailXBuffer.length = TRAIL_MAX_POINTS - 1;
       }
       distanceSinceLastTrailDeposit -= TRAIL_SPACING;
     }
 
-    // Build positions and colors arrays.
-    trailPositions.length = 0;
-    trailColors.length = 0;
+    // Path point 0: the player's current position (the strip emerges from
+    // directly underneath the runner).
+    {
+      const x = player.position.x;
+      trailPositions[0] = x - TRAIL_HALF_WIDTH;
+      trailPositions[1] = 0.06;
+      trailPositions[2] = 0;
+      trailPositions[3] = x + TRAIL_HALF_WIDTH;
+      trailPositions[4] = 0.06;
+      trailPositions[5] = 0;
+      trailColors[0] = TRAIL_R;
+      trailColors[1] = TRAIL_G;
+      trailColors[2] = TRAIL_B;
+      trailColors[3] = TRAIL_R;
+      trailColors[4] = TRAIL_G;
+      trailColors[5] = TRAIL_B;
+    }
 
-    // First point: the player's current position (the line emerges from
-    // exactly underneath the runner).
-    trailPositions.push(player.position.x, 0.06, 0);
-    trailColors.push(TRAIL_R, TRAIL_G, TRAIL_B);
-
+    // Path points 1..bufLen: buffered deposit samples drifting backward.
     const bufLen = trailXBuffer.length;
+    const totalPoints = bufLen + 1;
     for (let i = 0; i < bufLen; i++) {
-      const x = trailXBuffer[i] ?? player.position.x;
-      const z = i * TRAIL_SPACING + distanceSinceLastTrailDeposit;
-      trailPositions.push(x, 0.06, z);
-      // Fade by darkening the RGB toward the tail; bloom then drops off
-      // naturally as the brightness falls below the bloom threshold.
-      const t = (i + 1) / (bufLen + 1);
+      const sampleX = trailXBuffer[i] ?? player.position.x;
+      const sampleZ = i * TRAIL_SPACING + distanceSinceLastTrailDeposit;
+      const base = (i + 1) * 2 * 3;
+      trailPositions[base + 0] = sampleX - TRAIL_HALF_WIDTH;
+      trailPositions[base + 1] = 0.06;
+      trailPositions[base + 2] = sampleZ;
+      trailPositions[base + 3] = sampleX + TRAIL_HALF_WIDTH;
+      trailPositions[base + 4] = 0.06;
+      trailPositions[base + 5] = sampleZ;
+      const t = (i + 1) / totalPoints;
       const k = Math.pow(1 - t, 1.3);
-      trailColors.push(TRAIL_R * k, TRAIL_G * k, TRAIL_B * k);
+      const r = TRAIL_R * k;
+      const g = TRAIL_G * k;
+      const b = TRAIL_B * k;
+      trailColors[base + 0] = r;
+      trailColors[base + 1] = g;
+      trailColors[base + 2] = b;
+      trailColors[base + 3] = r;
+      trailColors[base + 4] = g;
+      trailColors[base + 5] = b;
     }
 
-    if (trailPositions.length >= 6) {
-      // At least 2 points = drawable line segment.
-      trailGeometry.setPositions(trailPositions);
-      trailGeometry.setColors(trailColors);
-      trailLine.computeLineDistances();
-      trailLine.visible = true;
-    } else {
-      trailLine.visible = false;
-    }
+    trailPositionAttribute.needsUpdate = true;
+    trailColorAttribute.needsUpdate = true;
+    // Number of quads is (totalPoints - 1); each quad has 6 indices.
+    trailGeometry.setDrawRange(0, Math.max(totalPoints - 1, 0) * 6);
 
     composer.render();
   }
@@ -429,7 +467,6 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     renderer.setSize(widthPx, heightPx, false);
     composer.setSize(widthPx, heightPx);
     bloom.resolution.set(widthPx, heightPx);
-    trailMaterial.resolution.set(widthPx, heightPx);
   }
 
   function destroy(): void {
