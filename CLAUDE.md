@@ -37,16 +37,16 @@ Constraints to keep in mind:
 - `specs/<###-name>/` - per-feature artifacts: `spec.md`, `plan.md`, `tasks.md`, etc. (created by skills, one folder per feature branch).
 
 <!-- SPECKIT START -->
-**Active feature**: `002-scoring-hud` — Scoring HUD (live score + elapsed timer).
+**Active feature**: `003-obstacles` — Random geometric obstacles with collision, game-over, and restart.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/002-scoring-hud/plan.md` (technical context + constitution check + project tree)
-- `specs/002-scoring-hud/spec.md` (user stories, requirements, success criteria)
-- `specs/002-scoring-hud/research.md` (Phase 0 decisions for this slice)
-- `specs/002-scoring-hud/data-model.md` (derived score + timer)
-- `specs/002-scoring-hud/contracts/module-contracts.md` (the new `src/score/` module API + DOM contract)
-- `specs/002-scoring-hud/quickstart.md` (slice-specific validation steps)
+- `specs/003-obstacles/plan.md` (technical context + constitution check + project tree)
+- `specs/003-obstacles/spec.md` (user stories, requirements, success criteria)
+- `specs/003-obstacles/research.md` (Phase 0 decisions for this slice)
+- `specs/003-obstacles/data-model.md` (new ObstacleGroup / ObstacleVariant / spawn schedule + `'game-over'` RunState)
+- `specs/003-obstacles/contracts/module-contracts.md` (new `src/obstacles/` module API + runner-engine extensions + DOM overlay contract)
+- `specs/003-obstacles/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture (Three.js scene + DOM overlays + library-first modules + the lane-runner mechanics) is captured in `specs/001-lane-runner/`.
+The foundational architecture (Three.js scene + DOM overlays + library-first modules + the lane-runner mechanics) is captured in `specs/001-lane-runner/` and `specs/002-scoring-hud/`. This slice introduces the **first fail state** in the game.
 <!-- SPECKIT END -->
