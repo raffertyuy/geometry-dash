@@ -37,6 +37,14 @@ Constraints to keep in mind:
 - `specs/<###-name>/` - per-feature artifacts: `spec.md`, `plan.md`, `tasks.md`, etc. (created by skills, one folder per feature branch).
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+**Active feature**: `001-lane-runner` — Lane Runner Core Movement.
+
+For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
+
+- `specs/001-lane-runner/plan.md` (technical context + constitution check + project tree)
+- `specs/001-lane-runner/spec.md` (user stories, requirements, success criteria)
+- `specs/001-lane-runner/research.md` (Phase 0 decisions + platform gotchas)
+- `specs/001-lane-runner/data-model.md` (entities + state machine)
+- `specs/001-lane-runner/contracts/module-contracts.md` (public module APIs)
+- `specs/001-lane-runner/quickstart.md` (dev / test / build / deploy steps)
 <!-- SPECKIT END -->
