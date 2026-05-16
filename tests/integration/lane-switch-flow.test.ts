@@ -6,10 +6,13 @@ import {
 } from '../../src/lane-state';
 import {
   createWorldState,
+  pauseRun,
+  resumeRun,
   startRun,
   tickWorld,
 } from '../../src/runner-engine';
 import { createInputAdapter } from '../../src/input-adapter';
+import { computeScore } from '../../src/score';
 import type { InputEvent, PlayerState, WorldState } from '../../src/shared/types';
 import { RUN_SPEED_UNITS_PER_SEC } from '../../src/shared/config';
 
@@ -92,6 +95,29 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     // World still advances independently.
     const w2 = tickWorld(world, 1000);
     expect(w2.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC, 5);
+  });
+
+  it('score derived from tickMs does not advance while the run is paused (FR-005)', () => {
+    let world: WorldState = startRun(createWorldState());
+
+    // Run for 3.4 seconds - score should read 34.
+    world = tickWorld(world, 3400);
+    expect(computeScore(world.tickMs)).toBe(34);
+
+    // Pause - any further tickWorld must be a no-op for tickMs.
+    world = pauseRun(world);
+    expect(world.runState).toBe('paused');
+
+    // Simulate the player tabbing away for 60 seconds (no Phaser-like
+    // auto-pause; tickWorld is the only thing that could move tickMs).
+    world = tickWorld(world, 60_000);
+    expect(world.tickMs).toBe(3400); // frozen
+    expect(computeScore(world.tickMs)).toBe(34); // unchanged
+
+    // Resume - the score continues from 34 on the next tick.
+    world = resumeRun(world);
+    world = tickWorld(world, 600); // another 6 score points
+    expect(computeScore(world.tickMs)).toBe(40);
   });
 
   it('a touch swipe drives the same end-to-end effect as a keyboard input', () => {

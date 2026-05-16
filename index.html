@@ -88,6 +88,52 @@
       #debug-overlay.hidden {
         display: none;
       }
+
+      #hud {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 5;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 16px 20px;
+        pointer-events: none;
+        color: #e8e8ef;
+        text-shadow: 0 0 8px rgba(24, 200, 255, 0.45);
+      }
+
+      #timer {
+        flex: 1 1 auto;
+        text-align: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(1.4rem, 4vw, 2.2rem);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: #18c8ff;
+        order: 2;
+      }
+
+      #score {
+        flex: 0 0 auto;
+        min-width: 4ch;
+        text-align: right;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(1.4rem, 4vw, 2.2rem);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: #ff8a30;
+        order: 3;
+      }
+
+      #hud::before {
+        /* Spacer to balance the score on the left so the timer stays
+           visually centred. */
+        content: '';
+        flex: 0 0 4ch;
+        order: 1;
+      }
     </style>
   </head>
   <body>
@@ -103,6 +149,11 @@ Swipe left or right on mobile</p>
     <div id="pause-overlay" class="overlay hidden">
       <h1>Paused</h1>
       <p>Tap or press any key to resume</p>
+    </div>
+
+    <div id="hud">
+      <div id="timer">0:00</div>
+      <div id="score">0</div>
     </div>
 
     <div id="debug-overlay" class="hidden"></div>

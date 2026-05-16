@@ -44,17 +44,17 @@ This slice does NOT introduce any new shared types or new tunables. The existing
 
 ### Tests for User Story 1 (write FIRST, assert red, then implement)
 
-- [ ] T001 [P] [US1] Write unit tests for `computeScore` and `formatScore`: `computeScore(0) === 0`, `computeScore(99) === 0`, `computeScore(100) === 1`, `computeScore(199) === 1`, `computeScore(200) === 2`, `computeScore(10_000) === 100` (spec SC-002 invariant), a monotonicity sweep across 0..700_000 ms in 100 ms steps asserting non-decreasing output, and a no-skip-or-duplicate sweep asserting the score sequence is `0, 1, 2, ...` with no gaps. Plus `formatScore(0) === '0'`, `formatScore(42) === '42'`, `formatScore(100000) === '100000'`. File: `src/score/score.test.ts`.
-- [ ] T002 [US1] Extend `tests/integration/lane-switch-flow.test.ts` with a new case: a run is started; tickWorld is called repeatedly; the world is paused via `pauseRun`; tickWorld is called again (large delta) while paused; `computeScore(world.tickMs)` MUST NOT advance. After `resumeRun`, further tickWorld calls advance the score again. This case is the integration-level proof of spec FR-005.
+- [X] T001 [P] [US1] Write unit tests for `computeScore` and `formatScore`: `computeScore(0) === 0`, `computeScore(99) === 0`, `computeScore(100) === 1`, `computeScore(199) === 1`, `computeScore(200) === 2`, `computeScore(10_000) === 100` (spec SC-002 invariant), a monotonicity sweep across 0..700_000 ms in 100 ms steps asserting non-decreasing output, and a no-skip-or-duplicate sweep asserting the score sequence is `0, 1, 2, ...` with no gaps. Plus `formatScore(0) === '0'`, `formatScore(42) === '42'`, `formatScore(100000) === '100000'`. File: `src/score/score.test.ts`.
+- [X] T002 [US1] Extend `tests/integration/lane-switch-flow.test.ts` with a new case: a run is started; tickWorld is called repeatedly; the world is paused via `pauseRun`; tickWorld is called again (large delta) while paused; `computeScore(world.tickMs)` MUST NOT advance. After `resumeRun`, further tickWorld calls advance the score again. This case is the integration-level proof of spec FR-005.
 
 ### Implementation for User Story 1
 
-- [ ] T003 [P] [US1] Implement `src/score/score.ts` with `computeScore(tickMs: number): number` returning `Math.floor(tickMs / 100)` and `formatScore(score: number): string` returning `String(score)`. Re-export both from `src/score/index.ts`. File: `src/score/score.ts` and `src/score/index.ts`.
-- [ ] T004 [US1] Make all unit tests from T001 pass. Iterate only on T003's implementation files. **Blocked by**: T001, T003.
-- [ ] T005 [US1] Make the integration test from T002 pass (will pass automatically once T003 lands, since the score derives from the already-correct `tickMs`). **Blocked by**: T002, T003.
-- [ ] T006 [US1] Update `index.html`: add a `<div id="hud">` container (position: fixed, top: 0, pointer-events: none, full-viewport width) and a `<div id="score">0</div>` child inside it (top-right, font-size clamp, monospace-ish). Add the new CSS rules inside the same `<style>` block as the existing overlay styles. File: `index.html`.
-- [ ] T007 [US1] Extend `GameLoopHostElements` in `src/game/game-loop.ts` with `readonly score: HTMLElement`. Inside the rAF loop (in the `'running'` branch, after `tickWorld`), add `host.score.textContent = formatScore(computeScore(world.tickMs))`. File: `src/game/game-loop.ts`.
-- [ ] T008 [US1] Update `src/main.ts`: resolve `#score` via `document.querySelector('#score')`, validate non-null (log + return on missing), and pass it to `createGameLoop({ ..., score })`. File: `src/main.ts`.
+- [X] T003 [P] [US1] Implement `src/score/score.ts` with `computeScore(tickMs: number): number` returning `Math.floor(tickMs / 100)` and `formatScore(score: number): string` returning `String(score)`. Re-export both from `src/score/index.ts`. File: `src/score/score.ts` and `src/score/index.ts`.
+- [X] T004 [US1] Make all unit tests from T001 pass. Iterate only on T003's implementation files. **Blocked by**: T001, T003.
+- [X] T005 [US1] Make the integration test from T002 pass (will pass automatically once T003 lands, since the score derives from the already-correct `tickMs`). **Blocked by**: T002, T003.
+- [X] T006 [US1] Update `index.html`: add a `<div id="hud">` container (position: fixed, top: 0, pointer-events: none, full-viewport width) and a `<div id="score">0</div>` child inside it (top-right, font-size clamp, monospace-ish). Add the new CSS rules inside the same `<style>` block as the existing overlay styles. File: `index.html`.
+- [X] T007 [US1] Extend `GameLoopHostElements` in `src/game/game-loop.ts` with `readonly score: HTMLElement`. Inside the rAF loop (in the `'running'` branch, after `tickWorld`), add `host.score.textContent = formatScore(computeScore(world.tickMs))`. File: `src/game/game-loop.ts`.
+- [X] T008 [US1] Update `src/main.ts`: resolve `#score` via `document.querySelector('#score')`, validate non-null (log + return on missing), and pass it to `createGameLoop({ ..., score })`. File: `src/main.ts`.
 - [ ] T009 [US1] Manual validation per [quickstart.md](./quickstart.md) §"Validate the slice (US1 - score readout)" - all five US1 acceptance scenarios in spec.md pass on a real desktop browser at `localhost:5173`.
 
 **Checkpoint**: US1 is fully functional - the player sees a live, pause-aware score readout. This is shippable as the slice's MVP.
@@ -69,15 +69,15 @@ This slice does NOT introduce any new shared types or new tunables. The existing
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] Extend `src/score/score.test.ts` with unit tests for `formatTimer`: `formatTimer(0) === '0:00'`, `formatTimer(999) === '0:00'`, `formatTimer(1_000) === '0:01'`, `formatTimer(59_999) === '0:59'`, `formatTimer(60_000) === '1:00'`, `formatTimer(599_999) === '9:59'`, `formatTimer(600_000) === '10:00'` (the M:SS -> MM:SS transition), `formatTimer(5_999_999) === '99:59'`, `formatTimer(6_000_000) === '100:00'`.
+- [X] T010 [P] [US2] Extend `src/score/score.test.ts` with unit tests for `formatTimer`: `formatTimer(0) === '0:00'`, `formatTimer(999) === '0:00'`, `formatTimer(1_000) === '0:01'`, `formatTimer(59_999) === '0:59'`, `formatTimer(60_000) === '1:00'`, `formatTimer(599_999) === '9:59'`, `formatTimer(600_000) === '10:00'` (the M:SS -> MM:SS transition), `formatTimer(5_999_999) === '99:59'`, `formatTimer(6_000_000) === '100:00'`.
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Add `formatTimer(tickMs: number): string` to `src/score/score.ts` and re-export from `src/score/index.ts`. Algorithm per data-model.md: `totalSeconds = Math.floor(tickMs / 1000); minutes = Math.floor(totalSeconds / 60); seconds = totalSeconds % 60; pad seconds to 2 digits; pad minutes to 2 digits at minutes >= 10`. **Blocked by**: T010.
-- [ ] T012 [US2] Make the new T010 tests pass by iterating on T011's implementation. **Blocked by**: T010, T011.
-- [ ] T013 [US2] Update `index.html`: add a `<div id="timer">0:00</div>` child INSIDE the existing `#hud` container (added in T006), positioned top-centre. Add CSS rules for `.hud-timer` (centred, slightly larger font for readability). File: `index.html`.
-- [ ] T014 [US2] Extend `GameLoopHostElements` in `src/game/game-loop.ts` with `readonly timer: HTMLElement`. Inside the rAF loop (next to the `host.score.textContent = ...` line from T007), add `host.timer.textContent = formatTimer(world.tickMs)`. File: `src/game/game-loop.ts`.
-- [ ] T015 [US2] Update `src/main.ts`: resolve `#timer` via `document.querySelector('#timer')`, validate non-null, pass it into `createGameLoop({ ..., timer })`. File: `src/main.ts`.
+- [X] T011 [US2] Add `formatTimer(tickMs: number): string` to `src/score/score.ts` and re-export from `src/score/index.ts`. Algorithm per data-model.md: `totalSeconds = Math.floor(tickMs / 1000); minutes = Math.floor(totalSeconds / 60); seconds = totalSeconds % 60; pad seconds to 2 digits; pad minutes to 2 digits at minutes >= 10`. **Blocked by**: T010.
+- [X] T012 [US2] Make the new T010 tests pass by iterating on T011's implementation. **Blocked by**: T010, T011.
+- [X] T013 [US2] Update `index.html`: add a `<div id="timer">0:00</div>` child INSIDE the existing `#hud` container (added in T006), positioned top-centre. Add CSS rules for `.hud-timer` (centred, slightly larger font for readability). File: `index.html`.
+- [X] T014 [US2] Extend `GameLoopHostElements` in `src/game/game-loop.ts` with `readonly timer: HTMLElement`. Inside the rAF loop (next to the `host.score.textContent = ...` line from T007), add `host.timer.textContent = formatTimer(world.tickMs)`. File: `src/game/game-loop.ts`.
+- [X] T015 [US2] Update `src/main.ts`: resolve `#timer` via `document.querySelector('#timer')`, validate non-null, pass it into `createGameLoop({ ..., timer })`. File: `src/main.ts`.
 - [ ] T016 [US2] Manual validation per [quickstart.md](./quickstart.md) §"Validate the slice (US2 - timer)" - all four US2 acceptance scenarios in spec.md pass on a real desktop browser. Note: the 10-minute boundary check is optional (time-permitting).
 
 **Checkpoint**: US1 AND US2 both work independently. The HUD shows both indicators; both pause cleanly.
@@ -88,9 +88,9 @@ This slice does NOT introduce any new shared types or new tunables. The existing
 
 **Purpose**: Run quality gates, validate the layout at narrow viewports, and confirm definition-of-done.
 
-- [ ] T017 Run `npm run typecheck`; resolve any TypeScript errors that surface.
-- [ ] T018 Run `npm run lint`; resolve any boundary violations. The `src/score/` module MUST NOT import `three` or any DOM types - the existing `no-restricted-imports` rule will catch this.
-- [ ] T019 Run `npm run build`; verify `dist/` contains the production bundle and that the gzipped size of `dist/assets/index-*.js` is still under the 500 KB Constitution budget. Manual / shell step.
+- [X] T017 Run `npm run typecheck`; resolve any TypeScript errors that surface.
+- [X] T018 Run `npm run lint`; resolve any boundary violations. The `src/score/` module MUST NOT import `three` or any DOM types - the existing `no-restricted-imports` rule will catch this.
+- [X] T019 Run `npm run build`; verify `dist/` contains the production bundle and that the gzipped size of `dist/assets/index-*.js` is still under the 500 KB Constitution budget. Manual / shell step.
 - [ ] T020 Validate the HUD layout on a narrow viewport (Chrome DevTools -> Device Toolbar -> "iPhone SE" or any 320 px wide preset). Both readouts MUST remain legible (font size >= 16 CSS px) and MUST NOT consume pointer events. Per [quickstart.md](./quickstart.md) §"Validate the HUD layout on a narrow viewport".
 - [ ] T021 Final end-to-end validation per [quickstart.md](./quickstart.md) §"Definition of done" - tick every checkbox.
 

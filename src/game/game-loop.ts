@@ -13,6 +13,7 @@ import {
   type DebugOverlay,
   type ThreeRenderer,
 } from '../renderer';
+import { computeScore, formatScore, formatTimer } from '../score';
 import type { InputEvent, PlayerState, WorldState } from '../shared/types';
 
 const MAX_FRAME_DT_MS = 100;
@@ -22,6 +23,8 @@ export interface GameLoopHostElements {
   readonly startScreen: HTMLElement;
   readonly pauseOverlay: HTMLElement;
   readonly debugOverlay: HTMLElement;
+  readonly score: HTMLElement;
+  readonly timer: HTMLElement;
 }
 
 export interface GameLoopHandles {
@@ -170,6 +173,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
 
     renderer.draw(player, world);
     debugOverlay.update(player, world, lastInput);
+    host.score.textContent = formatScore(computeScore(world.tickMs));
+    host.timer.textContent = formatTimer(world.tickMs);
   }
 
   rafId = requestAnimationFrame(frame);
