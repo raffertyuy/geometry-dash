@@ -9,7 +9,11 @@ const LANE_FILL_COLOURS: Readonly<Record<Lane, number>> = {
   right: 0x2a2a3a,
 };
 
-const LANE_WIDTH = 200;
+// Lane visual width equals the spacing between lane centres (180 px) so the
+// three lane backgrounds abut perfectly and each lane's visual midpoint
+// matches its LANE_X. Earlier value (200) caused overlap and pushed the
+// centre lane's visible midpoint 10 px left of LANE_X.centre.
+const LANE_WIDTH = LANE_X.centre - LANE_X.left;
 const PLAYER_SIZE = 80;
 const PLAYER_Y = Math.round(LOGICAL_HEIGHT * 0.78);
 
