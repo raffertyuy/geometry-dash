@@ -37,16 +37,16 @@ Constraints to keep in mind:
 - `specs/<###-name>/` - per-feature artifacts: `spec.md`, `plan.md`, `tasks.md`, etc. (created by skills, one folder per feature branch).
 
 <!-- SPECKIT START -->
-**Active feature**: `003-obstacles` — Random geometric obstacles with collision, game-over, and restart.
+**Active feature**: `004-difficulty-escalation` — Every 30 seconds run speed scales by 1.10x and the score per 0.1s increases by 1.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/003-obstacles/plan.md` (technical context + constitution check + project tree)
-- `specs/003-obstacles/spec.md` (user stories, requirements, success criteria)
-- `specs/003-obstacles/research.md` (Phase 0 decisions for this slice)
-- `specs/003-obstacles/data-model.md` (new ObstacleGroup / ObstacleVariant / spawn schedule + `'game-over'` RunState)
-- `specs/003-obstacles/contracts/module-contracts.md` (new `src/obstacles/` module API + runner-engine extensions + DOM overlay contract)
-- `specs/003-obstacles/quickstart.md` (slice-specific validation steps)
+- `specs/004-difficulty-escalation/plan.md` (technical context + constitution check + project tree)
+- `specs/004-difficulty-escalation/spec.md` (user stories, requirements, success criteria)
+- `specs/004-difficulty-escalation/research.md` (Phase 0 decisions for this slice)
+- `specs/004-difficulty-escalation/data-model.md` (derived tier + piecewise score formula)
+- `specs/004-difficulty-escalation/contracts/module-contracts.md` (new `src/escalation/` module API + `computeScore` rewrite + `tickWorld` optional param)
+- `specs/004-difficulty-escalation/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture (Three.js scene + DOM overlays + library-first modules + the lane-runner mechanics) is captured in `specs/001-lane-runner/` and `specs/002-scoring-hud/`. This slice introduces the **first fail state** in the game.
+The foundational architecture is captured in `specs/001-lane-runner/`, `specs/002-scoring-hud/`, and `specs/003-obstacles/`. This slice introduces the game's first **progression curve** — by tier ~20 the world becomes effectively unsurvivable, which is the natural endgame.
 <!-- SPECKIT END -->
