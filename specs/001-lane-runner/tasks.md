@@ -24,15 +24,15 @@ description: "Dependency-ordered tasks for the Lane Runner Core Movement slice (
 
 **Purpose**: Bring the Vite + TypeScript + Phaser + Vitest project to life. After this phase, `npm test` and `npm run dev` work, even though no game code exists yet.
 
-- [ ] T001 Initialize `package.json` at repo root with dependencies `phaser ^3.85`, `vite ^6`, `typescript ^5`, `vitest ^2`, `eslint ^9`, `@types/node ^22`, and npm scripts: `dev` (`vite`), `build` (`vite build`), `preview` (`vite preview`), `test` (`vitest run`), `test:watch` (`vitest`), `test:coverage` (`vitest run --coverage`), `typecheck` (`tsc --noEmit`), `lint` (`eslint . --ext .ts`). File: `package.json`
-- [ ] T002 [P] Add strict TypeScript config: `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`, `target: ES2022`, `module: ESNext`, `moduleResolution: bundler`, `lib: ["ES2022", "DOM"]`, `isolatedModules: true`. File: `tsconfig.json`
-- [ ] T003 [P] Add Vite config (no extra plugins yet; defaults are sufficient). File: `vite.config.ts`
-- [ ] T004 [P] Add Vitest config: `environment: 'node'` by default; renderer test files override to `'jsdom'`. File: `vitest.config.ts`
-- [ ] T005 [P] Add ESLint config with `no-restricted-imports` rules per `contracts/module-contracts.md` (Phaser banned outside `renderer/` and `phaser/`; cross-module imports must use `index.ts`). File: `.eslintrc.cjs`
-- [ ] T006 [P] Add `index.html` at repo root with a `<div id="game"></div>` host and a `<script type="module" src="/src/main.ts"></script>` entry. File: `index.html`
-- [ ] T007 [P] Add `.gitignore` covering `node_modules/`, `dist/`, `.vite/`, `coverage/`. File: `.gitignore`
-- [ ] T008 [P] Add a placeholder favicon (32x32 coloured square SVG). File: `public/favicon.svg`
-- [ ] T009 Run `npm install` and verify no errors. Manual / shell step (no file).
+- [X] T001 Initialize `package.json` at repo root with dependencies `phaser ^3.85`, `vite ^6`, `typescript ^5`, `vitest ^2`, `eslint ^9`, `@types/node ^22`, `typescript-eslint ^8`, `jsdom ^25`, and npm scripts: `dev`, `build`, `preview`, `test`, `test:watch`, `test:coverage`, `typecheck`, `lint`. File: `package.json`
+- [X] T002 [P] Add strict TypeScript config: `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`, `target: ES2022`, `module: ESNext`, `moduleResolution: bundler`, `lib: ["ES2022", "DOM"]`, `isolatedModules: true`. File: `tsconfig.json`
+- [X] T003 [P] Add Vite config (server port + es2022 build target + sourcemap). File: `vite.config.ts`
+- [X] T004 [P] Add Vitest config: `environment: 'node'` by default; `src/renderer/**` and `src/phaser/**` test files override to `'jsdom'`. File: `vitest.config.ts`
+- [X] T005 [P] Add ESLint flat config (ESLint 9) with `no-restricted-imports` rules per `contracts/module-contracts.md` (Phaser banned outside `renderer/` and `phaser/`; cross-module imports must use `index.ts`). File: `eslint.config.js` (modern flat config instead of legacy `.eslintrc.cjs`).
+- [X] T006 [P] Add `index.html` at repo root with a `<div id="game"></div>` host and a `<script type="module" src="/src/main.ts"></script>` entry. File: `index.html`
+- [X] T007 [P] Add `.gitignore` covering `node_modules/`, `dist/`, `.vite/`, `coverage/`. File: `.gitignore`
+- [X] T008 [P] Add a placeholder favicon (32x32 coloured square SVG). File: `public/favicon.svg`
+- [X] T009 Run `npm install` and verify no errors. Manual / shell step (no file).
 
 **Checkpoint**: `npm test` exits 0 with "no test files found"; `npm run dev` opens an empty page at `localhost:5173`.
 
@@ -44,8 +44,8 @@ description: "Dependency-ordered tasks for the Lane Runner Core Movement slice (
 
 **⚠️ CRITICAL**: No user-story work can begin until this phase is complete.
 
-- [ ] T010 Create `src/shared/types.ts` exporting `Lane`, `Direction`, `InputSource`, `InputEvent`, `PlayerState`, `RunState`, `WorldState` per `data-model.md`. All fields `readonly`. File: `src/shared/types.ts`
-- [ ] T011 Create `src/shared/config.ts` exporting `LANES`, `LANE_X`, `LOGICAL_WIDTH=720`, `LOGICAL_HEIGHT=1280`, `RUN_SPEED_UNITS_PER_SEC=200`, `LANE_SWITCH_DURATION_MS=200`, `SWIPE_MIN_HORIZONTAL_PX=30`, `SWIPE_MAX_DURATION_MS=500`, `SWIPE_HORIZONTAL_DOMINANCE=2`, `INPUT_COALESCE_WINDOW_MS=50`, and `DEBUG` (parses `?debug=1` once at module load, defaults `false` in non-browser env). File: `src/shared/config.ts`
+- [X] T010 Create `src/shared/types.ts` exporting `Lane`, `Direction`, `InputSource`, `InputEvent`, `PlayerState`, `RunState`, `WorldState` per `data-model.md`. All fields `readonly`. File: `src/shared/types.ts`
+- [X] T011 Create `src/shared/config.ts` exporting `LANES`, `LANE_X`, `LOGICAL_WIDTH=720`, `LOGICAL_HEIGHT=1280`, `RUN_SPEED_UNITS_PER_SEC=200`, `LANE_SWITCH_DURATION_MS=200`, `SWIPE_MIN_HORIZONTAL_PX=30`, `SWIPE_MAX_DURATION_MS=500`, `SWIPE_HORIZONTAL_DOMINANCE=2`, `INPUT_COALESCE_WINDOW_MS=50`, and `DEBUG` (parses `?debug=1` once at module load, defaults `false` in non-browser env). File: `src/shared/config.ts`
 
 **Checkpoint**: Foundation ready - user-story implementation can now begin.
 
