@@ -35,6 +35,7 @@ Constraints to keep in mind:
 - `.specify/` - Spec Kit templates, scripts, extensions. Don't edit by hand; use the `/speckit-*` skills.
 - `.specify/memory/constitution.md` - binding principles.
 - `specs/<###-name>/` - per-feature artifacts: `spec.md`, `plan.md`, `tasks.md`, etc. (created by skills, one folder per feature branch).
+- `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
 **Active feature**: `004-difficulty-escalation` — Every 30 seconds run speed scales by 1.10x and the score per 0.1s increases by 1.
