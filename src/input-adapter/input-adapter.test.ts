@@ -109,3 +109,79 @@ describe('input-adapter coalesce window', () => {
     expect(emitted[1]?.direction).toBe('left');
   });
 });
+
+describe('input-adapter touch path', () => {
+  it('emits a right swipe InputEvent when pointer travels >= 30 px right within 500 ms', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handlePointerDown(100, 500);
+    advance(200);
+    adapter.handlePointerUp(150, 500);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.direction).toBe('right');
+    expect(emitted[0]?.source).toBe('touch');
+  });
+
+  it('emits a left swipe InputEvent when pointer travels >= 30 px left within 500 ms', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handlePointerDown(150, 500);
+    advance(200);
+    adapter.handlePointerUp(100, 500);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.direction).toBe('left');
+    expect(emitted[0]?.source).toBe('touch');
+  });
+
+  it('does not emit when the gesture is too short (< 30 px)', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handlePointerDown(100, 500);
+    advance(200);
+    adapter.handlePointerUp(120, 500);
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('does not emit when the gesture is too slow (> 500 ms)', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handlePointerDown(100, 500);
+    advance(600);
+    adapter.handlePointerUp(200, 500);
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('does not emit when the gesture is mostly vertical', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handlePointerDown(100, 500);
+    advance(200);
+    adapter.handlePointerUp(150, 560); // 50 px horizontal vs 60 px vertical
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('ignores pointer-up with no preceding pointer-down', () => {
+    const { adapter, emitted } = makeAdapter();
+    adapter.handlePointerUp(200, 500);
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('coalesces a touch swipe within 50 ms of a same-direction keyboard input', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handleKeyDown({ key: 'ArrowRight', repeat: false });
+    advance(20);
+    adapter.handlePointerDown(100, 500);
+    advance(10); // total 30 ms since keyboard event
+    adapter.handlePointerUp(150, 500);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0]?.source).toBe('keyboard');
+  });
+
+  it('does NOT coalesce a touch swipe with an opposite-direction keyboard input', () => {
+    const { adapter, emitted, advance } = makeAdapter();
+    adapter.handleKeyDown({ key: 'ArrowRight', repeat: false });
+    advance(20);
+    adapter.handlePointerDown(150, 500);
+    advance(10);
+    adapter.handlePointerUp(100, 500); // left swipe
+    expect(emitted).toHaveLength(2);
+    expect(emitted[0]?.direction).toBe('right');
+    expect(emitted[1]?.direction).toBe('left');
+    expect(emitted[1]?.source).toBe('touch');
+  });
+});

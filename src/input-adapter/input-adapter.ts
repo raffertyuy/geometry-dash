@@ -1,5 +1,6 @@
 import { INPUT_COALESCE_WINDOW_MS } from '../shared/config';
 import type { Direction, InputEvent, InputSource } from '../shared/types';
+import { detectSwipe, type SwipePoint } from './swipe-detector';
 
 export interface InputAdapterDeps {
   readonly now: () => number;
@@ -26,6 +27,7 @@ export function createInputAdapter(deps: InputAdapterDeps): InputAdapter {
   const { now, emit } = deps;
   let lastEmitTimeMs: number | null = null;
   let lastEmitDirection: Direction | null = null;
+  let pointerStart: SwipePoint | null = null;
 
   function tryEmit(direction: Direction, source: InputSource): void {
     const timestampMs = now();
@@ -49,14 +51,19 @@ export function createInputAdapter(deps: InputAdapterDeps): InputAdapter {
       if (dir === null) return;
       tryEmit(dir, 'keyboard');
     },
-    handlePointerDown(_x, _y) {
-      // Touch path is implemented in US2 (T032/T033). No-op for now.
+    handlePointerDown(x, y) {
+      pointerStart = { x, y, tMs: now() };
     },
     handlePointerMove(_x, _y) {
       // No-op; swipe is end-to-end and does not require move samples.
     },
-    handlePointerUp(_x, _y) {
-      // Touch path is implemented in US2.
+    handlePointerUp(x, y) {
+      if (pointerStart === null) return;
+      const end: SwipePoint = { x, y, tMs: now() };
+      const direction = detectSwipe(pointerStart, end);
+      pointerStart = null;
+      if (direction === null) return;
+      tryEmit(direction, 'touch');
     },
   };
 }

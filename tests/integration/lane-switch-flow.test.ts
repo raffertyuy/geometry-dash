@@ -93,4 +93,32 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     const w2 = tickWorld(world, 1000);
     expect(w2.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC, 5);
   });
+
+  it('a touch swipe drives the same end-to-end effect as a keyboard input', () => {
+    let player: PlayerState = createPlayerState();
+    let world: WorldState = startRun(createWorldState());
+
+    let now = 0;
+    const adapter = createInputAdapter({
+      now: () => now,
+      emit: (e) => {
+        player = applyInput(player, e);
+      },
+    });
+
+    // User touches at (100, 500), holds 200 ms, lifts at (150, 500) - right swipe.
+    now = 16;
+    adapter.handlePointerDown(100, 500);
+    now = 216;
+    adapter.handlePointerUp(150, 500);
+
+    expect(player.targetLane).toBe('right');
+
+    // Animation completes after 200 ms of ticks.
+    player = tickPlayer(player, 200);
+    world = tickWorld(world, 200);
+    expect(player.currentLane).toBe('right');
+    expect(player.targetLane).toBeNull();
+    expect(world.distanceUnits).toBeCloseTo(40, 5);
+  });
 });

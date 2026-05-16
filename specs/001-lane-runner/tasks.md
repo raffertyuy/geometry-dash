@@ -92,16 +92,16 @@ description: "Dependency-ordered tasks for the Lane Runner Core Movement slice (
 
 ### Tests for User Story 2
 
-- [ ] T029 [P] [US2] Write unit tests for `swipe-detector.detectSwipe(start, end)`: 35 px horizontal swipe in 200 ms returns `'right'`; 25 px horizontal swipe returns `null` (too short); vertical-dominant swipe returns `null`; 600 ms swipe returns `null` (too slow); left swipe returns `'left'`. File: `src/input-adapter/swipe-detector.test.ts`
-- [ ] T030 [P] [US2] Extend `src/input-adapter/input-adapter.test.ts` with: a `pointerdown` followed by `pointerup` 200 ms later, 50 px to the right, emits one `'right'` InputEvent; a same-direction swipe within 50 ms of a prior keyboard event is suppressed by the coalesce window (covers G3 cross-source).
-- [ ] T031 [P] [US2] Extend `tests/integration/lane-switch-flow.test.ts` with a touch-driven path: pointer events end-to-end produce the same observable downstream effect as a keyboard input.
+- [X] T029 [P] [US2] Write unit tests for `swipe-detector.detectSwipe(start, end)`: 35 px horizontal swipe in 200 ms returns `'right'`; 25 px horizontal swipe returns `null` (too short); vertical-dominant swipe returns `null`; 600 ms swipe returns `null` (too slow); left swipe returns `'left'`. File: `src/input-adapter/swipe-detector.test.ts`
+- [X] T030 [P] [US2] Extend `src/input-adapter/input-adapter.test.ts` with: a `pointerdown` followed by `pointerup` 200 ms later, 50 px to the right, emits one `'right'` InputEvent; a same-direction swipe within 50 ms of a prior keyboard event is suppressed by the coalesce window (covers G3 cross-source).
+- [X] T031 [P] [US2] Extend `tests/integration/lane-switch-flow.test.ts` with a touch-driven path: pointer events end-to-end produce the same observable downstream effect as a keyboard input.
 
 ### Implementation for User Story 2
 
-- [ ] T032 [P] [US2] Implement `src/input-adapter/swipe-detector.ts`: pure function `detectSwipe(start, end): Direction | null` applying the thresholds in `shared/config.ts`. Not re-exported from `input-adapter/index.ts`. File: `src/input-adapter/swipe-detector.ts`
-- [ ] T033 [US2] Extend the input-adapter to wire pointer events through swipe-detector: `handlePointerDown` records start; `handlePointerUp` calls `detectSwipe(start, end)` and, on non-null result, emits the InputEvent (subject to the same coalesce window). File: `src/input-adapter/input-adapter.ts`
-- [ ] T034 [US2] Make the new tests from T029, T030, T031 pass. Iterate only on T032 and T033 implementations.
-- [ ] T035 [US2] Extend `RunScene.create()` to bridge `scene.input.on('pointerdown', ...)` and `scene.input.on('pointerup', ...)` to `inputAdapter.handlePointerDown` / `handlePointerUp`. File: `src/phaser/scenes/run-scene.ts`
+- [X] T032 [P] [US2] Implement `src/input-adapter/swipe-detector.ts`: pure function `detectSwipe(start, end): Direction | null` applying the thresholds in `shared/config.ts`. Not re-exported from `input-adapter/index.ts`. File: `src/input-adapter/swipe-detector.ts`
+- [X] T033 [US2] Extend the input-adapter to wire pointer events through swipe-detector: `handlePointerDown` records start; `handlePointerUp` calls `detectSwipe(start, end)` and, on non-null result, emits the InputEvent (subject to the same coalesce window). File: `src/input-adapter/input-adapter.ts`
+- [X] T034 [US2] Make the new tests from T029, T030, T031 pass. Iterate only on T032 and T033 implementations.
+- [X] T035 [US2] RunScene pointer wiring (completed pre-emptively in T026 - bridges `scene.input.on('pointerdown', ...)` and `scene.input.on('pointerup', ...)` to `inputAdapter.handlePointerDown` / `handlePointerUp`). File: `src/phaser/scenes/run-scene.ts`
 - [ ] T036 [US2] Manual validation per [quickstart.md](./quickstart.md) §"Validate the slice (US2 - mobile/touch)" - all four US2 acceptance scenarios pass on either a real phone or Chrome DevTools touch emulation.
 
 **Checkpoint**: US1 AND US2 both work independently. Game is playable end-to-end on desktop AND mobile.
