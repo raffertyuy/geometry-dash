@@ -88,6 +88,15 @@ export interface ThreeRenderer {
   draw(player: PlayerState, world: WorldState): void;
   resize(widthPx: number, heightPx: number): void;
   updateObstacles(groups: readonly ObstacleGroup[]): void;
+  /**
+   * Resets per-run internal state (cached distance baseline, scrolling-rung
+   * positions, speed-line positions, trail buffer). Must be called by the
+   * game-loop when restarting a run after game-over - otherwise the
+   * renderer's lastDistance still holds the at-death value while
+   * world.distanceUnits has jumped back to 0, producing a huge negative
+   * scroll on the first frame after restart.
+   */
+  reset(): void;
   destroy(): void;
 }
 
@@ -688,6 +697,28 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     obstacleEdgeMaterials.green.resolution.set(widthPx, heightPx);
   }
 
+  function reset(): void {
+    // Drop the cached distance baseline; the next frame computes a
+    // distanceDelta from world.distanceUnits (which is 0 after restartRun).
+    lastDistance = 0;
+    distanceSinceLastTrailDeposit = 0;
+    trailXBuffer.length = 0;
+    // Re-spread the scrolling rungs across the full visible track so they
+    // start from their initial positions, not from wherever they happened to
+    // be at the moment of game-over.
+    for (let i = 0; i < RUNG_COUNT; i++) {
+      rungs[i]!.position.z = TRACK_NEAR_Z - i * RUNG_SPACING;
+    }
+    // Same for speed lines.
+    for (const line of speedLines) {
+      line.mesh.position.set(
+        (Math.random() - 0.5) * 28,
+        0.6 + Math.random() * 6,
+        TRACK_FAR_Z + Math.random() * (TRACK_NEAR_Z - TRACK_FAR_Z + 20),
+      );
+    }
+  }
+
   function destroy(): void {
     renderer.dispose();
     composer.dispose();
@@ -704,5 +735,5 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     });
   }
 
-  return { draw, resize, updateObstacles, destroy };
+  return { draw, resize, updateObstacles, reset, destroy };
 }

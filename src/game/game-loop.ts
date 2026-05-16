@@ -115,6 +115,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     loopState = 'running';
     isAwaitingRestart = false;
     showGameOverOverlay(false);
+    // Reset renderer's per-run caches (lastDistance, rung positions, trail
+    // buffer) so the world doesn't "rewind" hugely on the first frame after
+    // restart.
+    renderer.reset();
   }
 
   function pauseFromBlur(): void {
