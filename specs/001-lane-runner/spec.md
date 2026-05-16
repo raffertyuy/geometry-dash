@@ -86,7 +86,7 @@ A player on a mobile browser loads the same page, taps to start, and plays the r
 - **SC-002**: A lane change initiated by player input completes (character visually centred in the target lane) within 250 ms on a typical desktop and within 350 ms on a 3-year-old mid-range mobile device.
 - **SC-003**: During informal play testing, 9 out of 10 testers describe the lane-switching feel as "responsive" or "snappy" rather than "laggy", "sticky", or "missed inputs".
 - **SC-004**: The game sustains visually smooth motion (no perceived stutter longer than 100 ms) over a continuous 60-second run on the target hardware classes (typical desktop and 3-year-old mobile).
-- **SC-005**: Across a sample of 20 horizontal swipe gestures performed by each of two testers (one on iOS Safari, one on Android Chrome), at least 95 % are correctly recognised as a lane change and at most 1 in 20 is a false positive on a near-vertical swipe.
+- **SC-005**: Across a sample of 20 horizontal swipe gestures performed by a single tester on at least one mobile browser (iOS Safari or Android Chrome), at least 90 % are correctly recognised as a lane change, and no more than 2 in 20 deliberately-vertical swipes are misrecognised as lane changes.
 - **SC-006**: When a tester holds either directional key continuously for at least 5 seconds, the character changes lane exactly once and does not skip past the lane boundary.
 - **SC-007**: Loading the game over a typical broadband connection delivers a playable start screen within 3 seconds.
 

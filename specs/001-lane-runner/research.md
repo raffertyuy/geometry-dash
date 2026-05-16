@@ -66,9 +66,9 @@ The user is new to game dev. These are the genuinely surprising things web games
 
 ### G1. Delta-time-correct game loop
 
-- **Decision**: Use Phaser's built-in `Scene.update(time, delta)` for any per-frame math. Compute velocities and animation progress *per delta*, not per frame.
-- **Rationale**: A frame on a 144 Hz monitor is ~7 ms; on a struggling phone it can be 33 ms. Per-frame math means the game runs ~5x faster on the desktop. Phaser hands you `delta` so this is just discipline, not implementation effort.
-- **Mitigation in code**: All "advance the world" calls take `dtMs` as an argument. Asserted in unit tests with deterministic delta values.
+- **Decision**: Use Phaser's built-in `Scene.update(time, delta)` for any per-frame math. Compute velocities and animation progress per `dtMs` (the delta argument), not per frame.
+- **Rationale**: A frame on a 144 Hz monitor is ~7 ms; on a struggling phone it can be 33 ms. Per-frame math means the game runs ~5x faster on the desktop. Phaser hands you the per-frame delta so this is just discipline, not implementation effort.
+- **Mitigation in code**: All "advance the world" calls take `dtMs` as their parameter (canonical name across the codebase per `contracts/module-contracts.md`). Asserted in unit tests with deterministic `dtMs` values.
 
 ### G2. Keyboard auto-repeat suppression
 
