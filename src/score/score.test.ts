@@ -1,16 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { computeScore, formatScore, formatTimer } from './index';
+import {
+  ESCALATION_SCORE_INCREMENT_PER_TIER,
+  ESCALATION_TIER_DURATION_MS,
+} from '../shared/config';
+
+// Reference implementation: a slow O(tier) loop that computes the
+// cumulative score by summing per-tier contributions one tier at a time.
+// computeScore uses a closed-form O(1) expression; comparing the two
+// catches any algebra mistakes in the closed form.
+function expectedScoreViaLoop(tickMs: number): number {
+  const TICK_MS = 100;
+  const ticksPerTier = ESCALATION_TIER_DURATION_MS / TICK_MS;
+  const N = Math.floor(tickMs / ESCALATION_TIER_DURATION_MS);
+  let total = 0;
+  for (let k = 0; k < N; k++) {
+    total += ticksPerTier * (1 + k * ESCALATION_SCORE_INCREMENT_PER_TIER);
+  }
+  const currentTicks = Math.floor(
+    (tickMs - N * ESCALATION_TIER_DURATION_MS) / TICK_MS,
+  );
+  total += currentTicks * (1 + N * ESCALATION_SCORE_INCREMENT_PER_TIER);
+  return total;
+}
 
 describe('computeScore', () => {
   it('starts at zero for zero elapsed time', () => {
     expect(computeScore(0)).toBe(0);
   });
 
-  it('stays at zero up to the first 100 ms boundary', () => {
+  it('stays at zero up to the first 100 ms tick', () => {
     expect(computeScore(99)).toBe(0);
   });
 
-  it('flips to 1 at exactly 100 ms', () => {
+  it('flips to 1 at exactly 100 ms (tier 0, base rate)', () => {
     expect(computeScore(100)).toBe(1);
   });
 
@@ -22,24 +45,72 @@ describe('computeScore', () => {
     expect(computeScore(200)).toBe(2);
   });
 
-  it('reads 100 at 10_000 ms (the spec SC-002 invariant)', () => {
-    expect(computeScore(10_000)).toBe(100);
-  });
-
-  it('is monotonically non-decreasing over a 700_000 ms sweep', () => {
+  it('is monotonically non-decreasing over a long sweep across many tier boundaries', () => {
     let prev = -1;
-    for (let tickMs = 0; tickMs <= 700_000; tickMs += 100) {
+    const sweepMs = 10 * ESCALATION_TIER_DURATION_MS;
+    for (let tickMs = 0; tickMs <= sweepMs; tickMs += 100) {
       const score = computeScore(tickMs);
       expect(score).toBeGreaterThanOrEqual(prev);
       prev = score;
     }
   });
 
-  it('produces the sequence 0, 1, 2, ... with no gaps or duplicates across 100 ms steps', () => {
-    for (let n = 0; n <= 600; n++) {
-      expect(computeScore(n * 100)).toBe(n);
-      expect(computeScore(n * 100 + 50)).toBe(n);
-      expect(computeScore(n * 100 + 99)).toBe(n);
+  it('matches the looping reference implementation across all tier boundaries (0..10)', () => {
+    for (let N = 0; N <= 10; N++) {
+      const t = N * ESCALATION_TIER_DURATION_MS;
+      expect(computeScore(t)).toBe(expectedScoreViaLoop(t));
+    }
+  });
+
+  it('matches the looping reference implementation mid-tier (0..10, +5s into each)', () => {
+    for (let N = 0; N <= 10; N++) {
+      const t = N * ESCALATION_TIER_DURATION_MS + Math.floor(ESCALATION_TIER_DURATION_MS / 2);
+      expect(computeScore(t)).toBe(expectedScoreViaLoop(t));
+    }
+  });
+
+  it('matches the reference at 100 random offsets within the first 10 tiers', () => {
+    for (let i = 0; i < 100; i++) {
+      const t = Math.floor(Math.random() * 10 * ESCALATION_TIER_DURATION_MS);
+      expect(computeScore(t)).toBe(expectedScoreViaLoop(t));
+    }
+  });
+});
+
+describe('computeScore - piecewise tier rate semantics', () => {
+  it('rate in tier 0 is exactly 1 point per 100 ms', () => {
+    // 0..(TIER_DURATION_MS-1) is tier 0 at the base rate.
+    expect(computeScore(100) - computeScore(0)).toBe(1);
+    expect(computeScore(200) - computeScore(100)).toBe(1);
+    expect(computeScore(1000) - computeScore(900)).toBe(1);
+  });
+
+  it('rate in tier 1 is (1 + INCREMENT) points per 100 ms', () => {
+    const tier1Start = ESCALATION_TIER_DURATION_MS;
+    const expectedRate = 1 + ESCALATION_SCORE_INCREMENT_PER_TIER;
+    expect(computeScore(tier1Start + 100) - computeScore(tier1Start)).toBe(
+      expectedRate,
+    );
+    expect(
+      computeScore(tier1Start + 200) - computeScore(tier1Start + 100),
+    ).toBe(expectedRate);
+  });
+
+  it('rate in tier 2 is (1 + 2 * INCREMENT) points per 100 ms', () => {
+    const tier2Start = 2 * ESCALATION_TIER_DURATION_MS;
+    const expectedRate = 1 + 2 * ESCALATION_SCORE_INCREMENT_PER_TIER;
+    expect(computeScore(tier2Start + 100) - computeScore(tier2Start)).toBe(
+      expectedRate,
+    );
+  });
+
+  it('rate in tier N is (1 + N * INCREMENT) for N = 0..5', () => {
+    for (let N = 0; N <= 5; N++) {
+      const start = N * ESCALATION_TIER_DURATION_MS;
+      const expectedRate = 1 + N * ESCALATION_SCORE_INCREMENT_PER_TIER;
+      expect(computeScore(start + 100) - computeScore(start)).toBe(
+        expectedRate,
+      );
     }
   });
 });

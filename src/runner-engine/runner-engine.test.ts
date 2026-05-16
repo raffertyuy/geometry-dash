@@ -122,6 +122,29 @@ describe('tickWorld', () => {
     expect(w.distanceUnits).toBe(distAtEnd);
     expect(w.tickMs).toBe(tickAtEnd);
   });
+
+  it('honours the optional speedOverride parameter when supplied', () => {
+    let w = startRun(createWorldState());
+    // 1.10x baseline override
+    w = tickWorld(w, 1000, RUN_SPEED_UNITS_PER_SEC * 1.10);
+    expect(w.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC * 1.10, 5);
+  });
+
+  it('the speedOverride is used instead of world.speedUnitsPerSec, not in addition', () => {
+    let w = startRun(createWorldState());
+    // 1.21x baseline override; world.speedUnitsPerSec is unchanged.
+    w = tickWorld(w, 1000, RUN_SPEED_UNITS_PER_SEC * 1.21);
+    expect(w.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC * 1.21, 5);
+    expect(w.speedUnitsPerSec).toBe(RUN_SPEED_UNITS_PER_SEC); // unchanged
+  });
+
+  it('the runState guard still applies when speedOverride is supplied', () => {
+    let w = pauseRun(startRun(createWorldState()));
+    // Override is large but should not move tickMs / distanceUnits while paused.
+    w = tickWorld(w, 1000, 9999);
+    expect(w.tickMs).toBe(0);
+    expect(w.distanceUnits).toBe(0);
+  });
 });
 
 describe('endRun', () => {

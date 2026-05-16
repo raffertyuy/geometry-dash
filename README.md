@@ -12,7 +12,7 @@ A 3D, Tron-themed, Subway-Surfers-style endless runner where the obstacles are g
 - **Scoring HUD**: live score (top-right, amber) and elapsed timer (top-centre, cyan) derived from a single `tickMs` source so they stay in sync.
 - **Random obstacles**: six 3D shape variants (cube, pillar, cylinder, icosahedron, trapezoid prism, wide bar) in three Tron colors (red, blue, green) with glowing edge outlines. Block one or two lanes; at least one lane is always passable.
 - **Game-over + restart**: hit an obstacle and the world freezes; an overlay shows your final score and time; tap or press any key to restart.
-- **Difficulty escalation** *(in development on `004-difficulty-escalation`)*: every 30 seconds the run speed multiplies by 1.10× and the score-per-100ms increment increases by +1.
+- **Difficulty escalation**: every N seconds the run speed multiplies by a configurable factor and the score-per-100 ms increment grows by a configurable amount. Spec defaults are 30 s / +1 / 1.10×; three knobs in `src/shared/config.ts` (`ESCALATION_TIER_DURATION_MS`, `ESCALATION_SCORE_INCREMENT_PER_TIER`, `ESCALATION_SPEED_MULTIPLIER_PER_TIER`) let you retune without code changes. Currently set to an accelerated test config (10 s / +10 / 2.00×) so the progression is feel-able in a short session.
 
 ## Getting started
 

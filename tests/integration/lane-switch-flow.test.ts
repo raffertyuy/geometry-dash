@@ -16,13 +16,17 @@ import {
 import { createInputAdapter } from '../../src/input-adapter';
 import { computeScore } from '../../src/score';
 import { collidesAt } from '../../src/obstacles';
+import { currentTier, speedMultiplier } from '../../src/escalation';
+import {
+  ESCALATION_TIER_DURATION_MS,
+  RUN_SPEED_UNITS_PER_SEC,
+} from '../../src/shared/config';
 import type {
   InputEvent,
   ObstacleGroup,
   PlayerState,
   WorldState,
 } from '../../src/shared/types';
-import { RUN_SPEED_UNITS_PER_SEC } from '../../src/shared/config';
 
 describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () => {
   it('moves the character through a full keyboard-driven lane change while distance accumulates', () => {
@@ -183,6 +187,46 @@ describe('lane-switch flow: keyboard input -> lane-state -> renderer call', () =
     expect(world.tickMs).toBe(0);
     expect(computeScore(world.tickMs)).toBe(0);
     expect(player.currentLane).toBe('centre');
+  });
+
+  it('effective speed scales by the per-tier multiplier at each tier boundary', () => {
+    // Simulate the game-loop's per-frame work: compute effective speed from
+    // currentTier(world.tickMs), pass it as the speedOverride to tickWorld.
+    let world: WorldState = startRun(createWorldState());
+    const baseline = world.speedUnitsPerSec;
+
+    function tickFrame(): number {
+      const tier = currentTier(world.tickMs);
+      const effectiveSpeed = baseline * speedMultiplier(tier);
+      const before = world.distanceUnits;
+      world = tickWorld(world, 100, effectiveSpeed);
+      return world.distanceUnits - before;
+    }
+
+    // Tick deep into tier 0.
+    while (currentTier(world.tickMs) < 1 && world.tickMs < ESCALATION_TIER_DURATION_MS - 5_000) {
+      tickFrame();
+    }
+    const tier0Delta = tickFrame();
+    expect(tier0Delta).toBeCloseTo((baseline * 100) / 1000, 5);
+
+    // Advance into tier 1.
+    while (currentTier(world.tickMs) < 1) tickFrame();
+    const tier1Delta = tickFrame();
+    expect(currentTier(world.tickMs)).toBe(1);
+    expect(tier1Delta).toBeCloseTo(
+      (baseline * speedMultiplier(1) * 100) / 1000,
+      5,
+    );
+
+    // Advance into tier 2.
+    while (currentTier(world.tickMs) < 2) tickFrame();
+    const tier2Delta = tickFrame();
+    expect(currentTier(world.tickMs)).toBe(2);
+    expect(tier2Delta).toBeCloseTo(
+      (baseline * speedMultiplier(2) * 100) / 1000,
+      5,
+    );
   });
 
   it('a touch swipe drives the same end-to-end effect as a keyboard input', () => {

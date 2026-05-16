@@ -1,3 +1,4 @@
+import { currentTier, speedMultiplier } from '../escalation';
 import { createInputAdapter, type InputAdapter } from '../input-adapter';
 import { applyInput, createPlayerState, tickPlayer } from '../lane-state';
 import {
@@ -22,6 +23,7 @@ import {
   type ThreeRenderer,
 } from '../renderer';
 import { computeScore, formatScore, formatTimer } from '../score';
+import { RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type {
   InputEvent,
   ObstacleGroup,
@@ -63,6 +65,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   let isAwaitingRestart = false;
   let obstacles: ObstacleGroup[] = [];
   let spawnSchedule: ObstacleSpawnSchedule = createSpawnSchedule(freshSeed());
+  let lastObservedTier = 0;
 
   const adapter: InputAdapter = createInputAdapter({
     now: () => performance.now(),
@@ -108,6 +111,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     obstacles = [];
     spawnSchedule = createSpawnSchedule(freshSeed());
     lastInput = undefined;
+    lastObservedTier = 0;
     loopState = 'running';
     isAwaitingRestart = false;
     showGameOverOverlay(false);
@@ -225,8 +229,22 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
 
     if (loopState === 'running' && !isAwaitingResume) {
       player = tickPlayer(player, dtMs);
+      // Every-30s tier-based escalation: tier rises with elapsed running
+      // time; speed scales 1.10x per tier (handled here as a speedOverride);
+      // score-per-tick scaling is handled inside computeScore.
+      const tier = currentTier(world.tickMs);
+      if (tier !== lastObservedTier) {
+        console.debug({
+          event: 'tier_advanced',
+          previousTier: lastObservedTier,
+          newTier: tier,
+          tickMs: world.tickMs,
+        });
+        lastObservedTier = tier;
+      }
+      const effectiveSpeed = RUN_SPEED_UNITS_PER_SEC * speedMultiplier(tier);
       const previousDistance = world.distanceUnits;
-      world = tickWorld(world, dtMs);
+      world = tickWorld(world, dtMs, effectiveSpeed);
       const distanceDelta = world.distanceUnits - previousDistance;
 
       // Advance each obstacle's worldZ; track previousWorldZ for collision.
