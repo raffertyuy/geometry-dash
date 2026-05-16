@@ -438,21 +438,25 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     'wide-bar': new THREE.BoxGeometry(4.0, 1.2, 1.0),
   };
 
-  // Pre-compute edge geometry per variant (extracts ridges where face
-  // normals differ by more than 1 degree). Wrapped in a LineSegmentsGeometry
-  // so the thick-line LineSegments2 / LineMaterial pipeline can render them
-  // at a configurable pixel width (vs the WebGL 1-px line cap on
-  // THREE.LineSegments). Shared across all instances of the variant since
-  // the geometry never changes.
-  function edgeGeom(g: THREE.BufferGeometry): LineSegmentsGeometry {
+  // Pre-compute edge geometry per variant. The thresholdAngleDeg parameter
+  // of EdgesGeometry controls which polygon-to-polygon transitions count as
+  // edges (face normals differing by more than threshold are emitted).
+  // Wrapped in a LineSegmentsGeometry so the thick-line LineSegments2 /
+  // LineMaterial pipeline can render them at a configurable pixel width
+  // (vs the WebGL 1-px line cap on THREE.LineSegments). Shared across all
+  // instances of the variant since the geometry never changes.
+  function edgeGeom(g: THREE.BufferGeometry, thresholdAngleDeg = 1): LineSegmentsGeometry {
     const lsg = new LineSegmentsGeometry();
-    lsg.fromEdgesGeometry(new THREE.EdgesGeometry(g, 1));
+    lsg.fromEdgesGeometry(new THREE.EdgesGeometry(g, thresholdAngleDeg));
     return lsg;
   }
   const obstacleEdgeGeometries: Readonly<Record<ObstacleVariantId, LineSegmentsGeometry>> = {
     cube: edgeGeom(obstacleGeometries.cube),
     pillar: edgeGeom(obstacleGeometries.pillar),
-    cylinder: edgeGeom(obstacleGeometries.cylinder),
+    // 10-segment cylinder side facets meet at 36 degrees; pushing the
+    // threshold to 40 drops the 10 vertical "cactus" edges and keeps only
+    // the 90-degree top + bottom rim circles.
+    cylinder: edgeGeom(obstacleGeometries.cylinder, 40),
     sphere: edgeGeom(obstacleGeometries.sphere),
     'trapezoid-prism': edgeGeom(obstacleGeometries['trapezoid-prism']),
     'wide-bar': edgeGeom(obstacleGeometries['wide-bar']),
