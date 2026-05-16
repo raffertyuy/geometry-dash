@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { easeOutCubic } from '../lane-state';
 import { LANE_X } from '../shared/config';
 import type {
@@ -365,18 +368,24 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
       toneMapped: true,
     });
   }
-  function makeEdgeMaterial(c: ObstacleColorVariant): THREE.LineBasicMaterial {
-    return new THREE.LineBasicMaterial({
+  function makeEdgeMaterial(c: ObstacleColorVariant): LineMaterial {
+    const mat = new LineMaterial({
       color: COL_OBSTACLES[c].edge,
+      linewidth: 2, // pixels (worldUnits: false)
+      worldUnits: false,
+      transparent: false,
+      depthWrite: true,
       toneMapped: false,
     });
+    mat.resolution.set(canvas.clientWidth, canvas.clientHeight);
+    return mat;
   }
   const obstacleBodyMaterials: Readonly<Record<ObstacleColorVariant, THREE.MeshStandardMaterial>> = {
     red: makeBodyMaterial('red'),
     blue: makeBodyMaterial('blue'),
     green: makeBodyMaterial('green'),
   };
-  const obstacleEdgeMaterials: Readonly<Record<ObstacleColorVariant, THREE.LineBasicMaterial>> = {
+  const obstacleEdgeMaterials: Readonly<Record<ObstacleColorVariant, LineMaterial>> = {
     red: makeEdgeMaterial('red'),
     blue: makeEdgeMaterial('blue'),
     green: makeEdgeMaterial('green'),
@@ -430,21 +439,29 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   };
 
   // Pre-compute edge geometry per variant (extracts ridges where face
-  // normals differ by more than 1 degree). Shared across all instances of
-  // the variant since the geometry never changes.
-  const obstacleEdgeGeometries: Readonly<Record<ObstacleVariantId, THREE.EdgesGeometry>> = {
-    cube: new THREE.EdgesGeometry(obstacleGeometries.cube, 1),
-    pillar: new THREE.EdgesGeometry(obstacleGeometries.pillar, 1),
-    cylinder: new THREE.EdgesGeometry(obstacleGeometries.cylinder, 1),
-    sphere: new THREE.EdgesGeometry(obstacleGeometries.sphere, 1),
-    'trapezoid-prism': new THREE.EdgesGeometry(obstacleGeometries['trapezoid-prism'], 1),
-    'wide-bar': new THREE.EdgesGeometry(obstacleGeometries['wide-bar'], 1),
+  // normals differ by more than 1 degree). Wrapped in a LineSegmentsGeometry
+  // so the thick-line LineSegments2 / LineMaterial pipeline can render them
+  // at a configurable pixel width (vs the WebGL 1-px line cap on
+  // THREE.LineSegments). Shared across all instances of the variant since
+  // the geometry never changes.
+  function edgeGeom(g: THREE.BufferGeometry): LineSegmentsGeometry {
+    const lsg = new LineSegmentsGeometry();
+    lsg.fromEdgesGeometry(new THREE.EdgesGeometry(g, 1));
+    return lsg;
+  }
+  const obstacleEdgeGeometries: Readonly<Record<ObstacleVariantId, LineSegmentsGeometry>> = {
+    cube: edgeGeom(obstacleGeometries.cube),
+    pillar: edgeGeom(obstacleGeometries.pillar),
+    cylinder: edgeGeom(obstacleGeometries.cylinder),
+    sphere: edgeGeom(obstacleGeometries.sphere),
+    'trapezoid-prism': edgeGeom(obstacleGeometries['trapezoid-prism']),
+    'wide-bar': edgeGeom(obstacleGeometries['wide-bar']),
   };
 
   interface ObstacleSlot {
     readonly group: THREE.Group;
     readonly body: THREE.Mesh;
-    readonly edges: THREE.LineSegments;
+    readonly edges: LineSegments2;
   }
 
   const obstaclePool: Map<ObstacleVariantId, ObstacleSlot[]> = new Map();
@@ -453,7 +470,7 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     for (let i = 0; i < OBSTACLE_POOL_SIZE; i++) {
       const slotGroup = new THREE.Group();
       const body = new THREE.Mesh(obstacleGeometries[variantId], obstacleBodyMaterials.red);
-      const edges = new THREE.LineSegments(
+      const edges = new LineSegments2(
         obstacleEdgeGeometries[variantId],
         obstacleEdgeMaterials.red,
       );
@@ -662,6 +679,9 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     renderer.setSize(widthPx, heightPx, false);
     composer.setSize(widthPx, heightPx);
     bloom.resolution.set(widthPx, heightPx);
+    obstacleEdgeMaterials.red.resolution.set(widthPx, heightPx);
+    obstacleEdgeMaterials.blue.resolution.set(widthPx, heightPx);
+    obstacleEdgeMaterials.green.resolution.set(widthPx, heightPx);
   }
 
   function destroy(): void {
