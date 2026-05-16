@@ -112,10 +112,10 @@ description: "Dependency-ordered tasks for the Lane Runner Core Movement slice (
 
 **Purpose**: Verify quality gates and definition-of-done, then ship the preview.
 
-- [ ] T037 [P] Add a smoke test that boots a headless Phaser game with `BootScene` and asserts no errors are emitted. Uses Vitest's `'jsdom'` environment for this single file. File: `src/phaser/scenes/boot-scene.test.ts`
-- [ ] T038 Run `npm run typecheck`; resolve any TypeScript errors that surface.
-- [ ] T039 Run `npm run lint`; resolve any boundary violations (the `no-restricted-imports` rule should NOT fire if Phase 3+4 followed the contracts).
-- [ ] T040 Run `npm run build`; verify `dist/` contains the production bundle and that the gzipped size of `dist/assets/index-*.js` is under 500 KB. Manual / shell step.
+- [~] T037 [P] Add a smoke test that boots a headless Phaser game with `BootScene` and asserts no errors are emitted. **DEFERRED**: Phaser's module-init runs `CanvasFeatures.checkInverseAlpha` which requires a real 2D canvas context. jsdom does not provide one, and `node-canvas` requires Windows native build tools we do not require contributors to install. Constitution Principle II classifies rendering code as "exempt from strict TDD" - manual validation in T028/T036 covers scene mounting in practice. Will revisit if/when a browser-based test runner (Playwright) is added in a later slice. File would have been: `src/phaser/scenes/boot-scene.test.ts`
+- [X] T038 Run `npm run typecheck`; resolve any TypeScript errors that surface. **Passed clean.**
+- [X] T039 Run `npm run lint`; resolve any boundary violations (the `no-restricted-imports` rule should NOT fire if Phase 3+4 followed the contracts). **Passed clean.**
+- [X] T040 Run `npm run build`; verify `dist/` contains the production bundle and that the gzipped size of `dist/assets/index-*.js` is under 500 KB. **Passed: 342.75 KB gzipped (68% of the 500 KB budget).**
 - [ ] T041 Final end-to-end validation per [quickstart.md](./quickstart.md) §"Definition of done for this slice" - tick every checkbox.
 - [ ] T042 Deploy a Cloudflare Pages preview from this branch per [quickstart.md](./quickstart.md) §"Deploy to Cloudflare Pages" - confirm the preview URL is playable on both desktop and a mobile browser.
 - [ ] T043 [P] Run a 60-second profile of a continuous run using the browser's Performance panel (Chrome DevTools or equivalent) on a typical desktop and on a 3-year-old mid-range mobile. Record any long task > 100 ms or any FPS drop below 60 (desktop) / 30 (mobile). Closes spec.md SC-004 and FR-007 measurement gap. No file output; capture findings in PR description.
