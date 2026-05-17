@@ -36,6 +36,7 @@ import {
   createMuteButton,
   createPauseButton,
   createProblemModal,
+  createResumeCountdown,
   createThreeRenderer,
   type DebugOverlay,
   type FloatingScore,
@@ -44,6 +45,7 @@ import {
   type MuteButton,
   type PauseButton,
   type ProblemModal,
+  type ResumeCountdown,
   type ThreeRenderer,
 } from '../renderer';
 import { createAudioEngine, type AudioEngine } from '../audio';
@@ -78,6 +80,7 @@ export interface GameLoopHostElements {
   readonly howToPlayLinkGameOver: HTMLElement;
   readonly pauseButton: HTMLButtonElement;
   readonly muteButton: HTMLButtonElement;
+  readonly resumeCountdown: HTMLElement;
 }
 
 /**
@@ -129,7 +132,14 @@ export interface GameLoopHandles {
   dispose(): void;
 }
 
-type LoopState = 'start-screen' | 'running' | 'paused' | 'game-over';
+type LoopState =
+  | 'start-screen'
+  | 'running'
+  | 'paused'
+  | 'game-over'
+  | 'resume-countdown';
+
+const RESUME_COUNTDOWN_TOTAL_MS = 3_000;
 
 function freshSeed(): number {
   return (performance.now() * 1000) ^ 0x9e3779b9;
@@ -174,6 +184,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
       audioEngine.play(isCorrect ? 'correct-answer' : 'life-lost'),
   });
   const floatingScore: FloatingScore = createFloatingScore(host.floatingScores);
+  const resumeCountdown: ResumeCountdown = createResumeCountdown(host.resumeCountdown);
+  let resumeCountdownRemainingMs = 0;
+  let resumeCountdownLastSecondsShown = 0;
   function resumeFromPauseButton(): void {
     if (loopState !== 'paused') return;
     world = resumeRun(world);
@@ -355,9 +368,26 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
       if (world.runState === 'game-over') {
         triggerGameOver();
       } else {
-        // Run continues — swap back to default BGM.
+        // Run continues — swap back to default BGM and give the player a
+        // brief "ready-up" beat before motion resumes.
         audioEngine.setBgmTrack('default');
+        startResumeCountdown();
       }
+    });
+  }
+
+  function startResumeCountdown(): void {
+    loopState = 'resume-countdown';
+    resumeCountdownRemainingMs = RESUME_COUNTDOWN_TOTAL_MS;
+    resumeCountdownLastSecondsShown = Math.ceil(
+      RESUME_COUNTDOWN_TOTAL_MS / 1000,
+    );
+    resumeCountdown.show(resumeCountdownLastSecondsShown);
+    audioEngine.play('countdown-tick');
+    console.debug({
+      event: 'resume_countdown_started',
+      tickMs: world.tickMs,
+      durationMs: RESUME_COUNTDOWN_TOTAL_MS,
     });
   }
 
@@ -404,6 +434,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     // game-loop ignores lane-change keys during 'answering' so a stray
     // arrow-key doesn't steer the runner into a wall on resume.
     if (world.runState === 'answering') return;
+    // Resume-countdown freezes the run — drop lane-change keys so a key
+    // mash mid-countdown doesn't pre-queue a swerve.
+    if (loopState === 'resume-countdown') return;
     adapter.handleKeyDown({ key: event.key, repeat: event.repeat });
   }
 
@@ -432,6 +465,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     // Pointer events anywhere else are ignored while answering so a stray
     // tap doesn't trigger a swipe gesture.
     if (world.runState === 'answering') return;
+    if (loopState === 'resume-countdown') return;
     adapter.handlePointerDown(event.clientX, event.clientY);
   }
 
@@ -492,8 +526,33 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     lastTimeMs = nowMs;
     const dtMs = Math.min(rawDt, MAX_FRAME_DT_MS);
 
+    // "Ready-up" countdown after a problem-gate modal closes. The world
+    // stays frozen (loopState !== 'running' below) until this reaches 0.
+    if (loopState === 'resume-countdown') {
+      resumeCountdownRemainingMs -= dtMs;
+      if (resumeCountdownRemainingMs <= 0) {
+        resumeCountdown.hide();
+        loopState = 'running';
+        console.debug({
+          event: 'resume_countdown_complete',
+          tickMs: world.tickMs,
+        });
+      } else {
+        const secondsLeft = Math.max(
+          1,
+          Math.ceil(resumeCountdownRemainingMs / 1000),
+        );
+        if (secondsLeft !== resumeCountdownLastSecondsShown) {
+          resumeCountdownLastSecondsShown = secondsLeft;
+          resumeCountdown.setSecondsRemaining(secondsLeft);
+          audioEngine.play('countdown-tick');
+        }
+      }
+    }
+
     // The per-frame world update runs only while truly running. 'answering'
-    // (modal open) and 'paused' / 'game-over' all skip the block.
+    // (modal open) and 'paused' / 'game-over' / 'resume-countdown' all skip
+    // the block.
     if (
       loopState === 'running' &&
       !isAwaitingResume &&
@@ -645,6 +704,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     muteButton.destroy();
     audioEngine.destroy();
     problemModal.destroy();
+    resumeCountdown.destroy();
     floatingScore.destroy();
     livesHud.destroy();
     debugOverlay.destroy();

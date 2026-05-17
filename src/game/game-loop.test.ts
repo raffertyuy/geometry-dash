@@ -69,6 +69,15 @@ describe('derivePauseButtonState', () => {
     );
     expect(s).toEqual({ visible: false, enabled: false });
   });
+
+  it('resume-countdown (post-modal ready-up): not visible (loopState gates the render)', () => {
+    const s = derivePauseButtonState(
+      'resume-countdown',
+      world({ runState: 'running', invincibilityRemainingMs: 0 }),
+      false,
+    );
+    expect(s).toEqual({ visible: false, enabled: false });
+  });
 });
 
 describe('applyAnswerToWorld', () => {

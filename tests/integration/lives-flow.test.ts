@@ -13,15 +13,15 @@ import {
 
 /**
  * End-to-end pure-logic exercise of the lives + invincibility flow:
- * obstacle hit -> life lost + 3-second invincibility window -> obstacles
- * during the window are silently absorbed -> window expires -> next
- * obstacle costs another life -> third strike ends the run. Pure logic
- * only: no game-loop instance, no DOM, no Three.js. The game-loop's
+ * obstacle hit -> life lost + invincibility window -> obstacles during
+ * the window are silently absorbed -> window expires -> next obstacle
+ * costs another life -> third strike ends the run. Pure logic only:
+ * no game-loop instance, no DOM, no Three.js. The game-loop's
  * collision-check + respawn glue is exercised separately by manual
  * validation (T040).
  */
 
-describe('lives flow: obstacle hits cost a life + grant a 3s invincibility window', () => {
+describe('lives flow: obstacle hits cost a life + grant an invincibility window', () => {
   it('first obstacle hit drops lives 3 -> 2 and grants INVINCIBILITY_DURATION_MS of invincibility', () => {
     const world0 = startRun(createWorldState());
     expect(world0.lives).toBe(MAX_LIVES);
@@ -41,10 +41,11 @@ describe('lives flow: obstacle hits cost a life + grant a 3s invincibility windo
     let world = startRun(createWorldState());
     world = consumeLife(world, 'obstacle');
 
-    // Tick 1500ms — still invincible (1500 ms remaining of 3000).
-    world = tickInvincibility(world, 1500);
+    // Tick half the window — still invincible.
+    const halfWindow = Math.floor(INVINCIBILITY_DURATION_MS / 2);
+    world = tickInvincibility(world, halfWindow);
     expect(world.invincibilityRemainingMs).toBe(
-      INVINCIBILITY_DURATION_MS - 1500,
+      INVINCIBILITY_DURATION_MS - halfWindow,
     );
 
     // Game-loop equivalent: another obstacle collision arrives.
@@ -129,7 +130,7 @@ describe('lives flow: wrong-answer life loss is independent of obstacle invincib
 
   it('mixed obstacle + wrong-answer losses still reach game-over at 0 lives', () => {
     let world = startRun(createWorldState());
-    world = consumeLife(world, 'obstacle'); // 3 -> 2, invinc=3000
+    world = consumeLife(world, 'obstacle'); // 3 -> 2, invinc set
     world = tickInvincibility(world, INVINCIBILITY_DURATION_MS); // invinc=0
     world = consumeLife(world, 'wrong-answer'); // 2 -> 1, invinc unchanged
     expect(world.invincibilityRemainingMs).toBe(0);

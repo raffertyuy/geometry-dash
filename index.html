@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-J5DKFXK0RW"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-J5DKFXK0RW');
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -155,6 +163,9 @@
         letter-spacing: 0.04em;
         color: #ff8a30;
         order: 3;
+        /* Reserve clear space for the fixed-position mute button at the
+           top-right so the two never overlap on narrow viewports. */
+        margin-right: clamp(44px, 11vw, 60px);
       }
 
       #lives-hud {
@@ -440,7 +451,9 @@
       #floating-scores {
         position: fixed;
         top: clamp(48px, 6vh, 64px);
-        right: 20px;
+        /* Aligned to where the score readout actually sits — see the
+           matching margin-right on #score above. */
+        right: clamp(64px, 13vw, 80px);
         z-index: 6;
         pointer-events: none;
         display: flex;
@@ -778,6 +791,50 @@
         border-color: rgba(144, 144, 160, 0.45);
         opacity: 0.7;
       }
+
+      /* Big "ready-up" countdown shown after a problem-gate answer commits
+         and the modal closes — gives the player a beat to re-grip before
+         the world starts moving again. The overlay swallows no input; it's
+         purely visual. Each digit re-triggers the pulse animation by
+         toggling .is-pulsing (a JS-side reflow restart). */
+      #resume-countdown {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 6;
+      }
+
+      #resume-countdown.hidden {
+        display: none;
+      }
+
+      .resume-countdown-digit {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(7rem, 32vw, 16rem);
+        font-weight: 900;
+        color: #18c8ff;
+        text-shadow:
+          0 0 24px rgba(24, 200, 255, 0.85),
+          0 0 56px rgba(24, 200, 255, 0.55);
+        letter-spacing: 0.05em;
+        line-height: 1;
+        opacity: 0;
+        transform: scale(0.55);
+      }
+
+      .resume-countdown-digit.is-pulsing {
+        animation: resume-countdown-pulse 1s ease-out forwards;
+      }
+
+      @keyframes resume-countdown-pulse {
+        0%   { transform: scale(0.55); opacity: 0; }
+        20%  { transform: scale(1.15); opacity: 1; }
+        80%  { transform: scale(1);    opacity: 1; }
+        100% { transform: scale(0.9);  opacity: 0.6; }
+      }
     </style>
   </head>
   <body>
@@ -821,6 +878,8 @@ Swipe left or right on mobile</p>
     <button id="mute-button" class="mute-button" type="button" aria-label="Mute audio" aria-pressed="false">🔊</button>
 
     <div id="floating-scores" aria-hidden="true"></div>
+
+    <div id="resume-countdown" class="hidden" aria-live="polite" aria-hidden="true"></div>
 
     <div id="debug-overlay" class="hidden"></div>
 

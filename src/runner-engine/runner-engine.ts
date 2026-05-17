@@ -113,7 +113,8 @@ export function enterAnswering(
 
 /**
  * Decrements `lives` by 1 and (for `cause === 'obstacle'`) grants a fresh
- * 3-second invincibility window. Transitions to 'game-over' when the
+ * post-respawn invincibility window (see `INVINCIBILITY_DURATION_MS`).
+ * Transitions to 'game-over' when the
  * decrement drives lives to zero. The cause is also threaded into the
  * `run_ended` payload so observability can distinguish obstacle deaths
  * from wrong-answer deaths.

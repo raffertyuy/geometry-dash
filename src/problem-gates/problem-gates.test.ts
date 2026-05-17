@@ -167,6 +167,50 @@ describe('augmentRowWithGates', () => {
       }
     }
   });
+
+  it('never spawns the same problem id back-to-back within a difficulty (recent-buffer dedup)', () => {
+    // Sweep a wide range of seeds: for each, drain ~80 gates per difficulty
+    // and assert no two consecutive same-difficulty problem ids match.
+    const seeds = [1, 7, 42, 99, 2024, 0xdeadbeef, 0x1337, 0xbeadface];
+    for (const seedStart of seeds) {
+      let state = createGateSpawnState(seedStart);
+      const lastIdByDifficulty: Partial<Record<GateDifficulty, string>> = {};
+      let totalSeen = 0;
+      for (let i = 0; i < 600 && totalSeen < 240; i++) {
+        const r = augmentRowWithGates([], -34, state);
+        state = r.state;
+        for (const g of r.gates) {
+          const prev = lastIdByDifficulty[g.difficulty];
+          if (prev !== undefined) {
+            expect(prev).not.toBe(g.problem.id);
+          }
+          lastIdByDifficulty[g.difficulty] = g.problem.id;
+          totalSeen += 1;
+        }
+      }
+    }
+  });
+
+  it('recent-buffer dedup is per-difficulty (a B id repeat in the buffer does not block an M id)', () => {
+    // Construct a state where we know the last B id and ensure that M
+    // / A spawns aren't artificially restricted by B history. The simplest
+    // sanity check: across many spawns the M and A pools still emit
+    // multiple distinct ids.
+    let state = createGateSpawnState(31337);
+    const mIds = new Set<string>();
+    const aIds = new Set<string>();
+    for (let i = 0; i < 300; i++) {
+      const r = augmentRowWithGates([], -34, state);
+      state = r.state;
+      for (const g of r.gates) {
+        if (g.difficulty === 'M') mIds.add(g.problem.id);
+        if (g.difficulty === 'A') aIds.add(g.problem.id);
+      }
+    }
+    // Sanity: not all M / A spawns collapsed to a single id.
+    expect(mIds.size).toBeGreaterThan(1);
+    expect(aIds.size).toBeGreaterThan(1);
+  });
 });
 
 describe('gateCollidesAt', () => {
