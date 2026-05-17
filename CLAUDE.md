@@ -61,16 +61,16 @@ Constraints to keep in mind:
 - `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
-**Active feature**: `007-problem-timer` — Add a visible per-question countdown to the problem-gate modal. Basic = 60 s, Medium = 120 s, Advanced = 180 s. Timeouts route through the existing wrong-answer pipeline (lose the difficulty's points, lose a life, correct answer highlighted in review state, 3-second auto-continue, respawn invincibility) — no new penalty, no special case. Countdown is wall-clock-driven via `performance.now()` so background-tab throttling cannot grant extra time. The modal's `onResolve` callback contract widens from a bare `choiceIndex` to a tagged `AnswerResult` union so timeouts are first-class. Last 10 seconds adopt an urgent visual state (red + `Hurry!` label + pulse) per the constitution's no-colour-alone rule.
+**Active feature**: `008-how-to-play` — Replace the "Problem Credits" link on the start and game-over screens with a single "How to Play" link that opens a new three-section modal (General Rules / Problem Cubes / Credits). The Problem Cubes section renders one row per difficulty with a coloured swatch + label + description + point value + countdown. Credits inherits the CC-BY source list from the deleted `credits-panel` module. Also add a top-of-playfield **Pause button** that is rendered only while a run is in progress and enabled only when the run is actively running with no gate modal open and no respawn invincibility blinking. Pressing the button (or ESC / SPACE) pauses the run via the existing `pauseRun` reducer and opens the same How-to-Play modal in pause-mode; closing the modal (X / ESC / SPACE) calls `resumeRun`.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/007-problem-timer/plan.md` (technical context + constitution check + project tree)
-- `specs/007-problem-timer/spec.md` (user stories, requirements, success criteria)
-- `specs/007-problem-timer/research.md` (Phase 0 decisions for this slice)
-- `specs/007-problem-timer/data-model.md` (`AnswerResult` + `QuestionTimerState` + constants)
-- `specs/007-problem-timer/contracts/module-contracts.md` (updated `ProblemModal.show` contract + game-loop handler + debug-overlay extension)
-- `specs/007-problem-timer/quickstart.md` (slice-specific validation steps)
+- `specs/008-how-to-play/plan.md` (technical context + constitution check + project tree)
+- `specs/008-how-to-play/spec.md` (user stories, requirements, success criteria)
+- `specs/008-how-to-play/research.md` (module-replacement decision, mode-as-closure-state, pause-button derivation, ESC/SPACE capture)
+- `specs/008-how-to-play/data-model.md` (`HowToPlayMode` + Pause-button derivation rules)
+- `specs/008-how-to-play/contracts/module-contracts.md` (new `how-to-play-modal` + `pause-button` modules; deleted `credits-panel`)
+- `specs/008-how-to-play/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture is captured in `specs/001-lane-runner/` through `specs/006-geometry-problems/`. This slice is a small UX layer over the existing problem-gate modal: no new module, no new dependency, ~100 net source lines plus tests.
+The foundational architecture is captured in `specs/001-lane-runner/` through `specs/007-problem-timer/`. This slice replaces the existing credits panel with a richer tutorial modal and adds the first in-game pause affordance with a UI surface (separate from the existing pause-on-blur path).
 <!-- SPECKIT END -->
