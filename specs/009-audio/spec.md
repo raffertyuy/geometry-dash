@@ -12,21 +12,22 @@
 
 ### User Story 1 — Game has an audible backbone (Priority: P1) 🎯 MVP
 
-When the player starts a run, a looping background music track plays for the duration of the run. The music is unobtrusive, low- to mid-volume, and matches the tron aesthetic. Whenever the run is suspended for any reason — Pause button → How-to-Play modal, problem-gate modal, or browser tab loses focus — the music pauses too. When the run resumes, the music resumes from where it left off (not from the start).
+When the player starts a run, a looping **default** background-music track plays — unobtrusive, low- to mid-volume, tron aesthetic. While the player is answering a problem-cube (the gate modal is open), the music **switches to a different "math contest / battle of the brains"-style track**: more tense, with a clear time-pressure feel, that loops underneath the question while the player is thinking. When the gate modal closes (correct, wrong, or timeout), the audio switches back to the default track. Whenever the run is suspended without a gate modal — Pause button → How-to-Play modal, or browser tab loses focus — the music pauses entirely; on resume it picks up where it left off.
 
-**Why this priority**: A running game without any audio feels like a tech demo. Background music is the single largest perceptual lift and is the foundation other sounds layer on top of. It also forces the audio-pipeline scaffolding to exist (asset loading, user-gesture unlocking, pause coupling, mute), so subsequent SFX user stories become small additions.
+**Why this priority**: A running game without any audio feels like a tech demo. Background music is the single largest perceptual lift and is the foundation other sounds layer on top of. The default ↔ contest swap also makes the gate modal feel like the moment of high stakes it is. This story also forces the audio-pipeline scaffolding to exist (asset loading, user-gesture unlocking, pause coupling, mute, multi-track), so subsequent SFX user stories become small additions.
 
-**Independent Test**: Open the game, dismiss the start screen with a tap (the required user gesture), confirm BGM begins playing within 1 second. Open the Pause button → How-to-Play modal; BGM stops. Close the modal; BGM resumes from the same position (audible by leaving the modal open for 5 seconds — the track should pick up where it left off, not restart). Hit a problem cube; BGM stops while the gate modal is open; resumes when the modal closes. Switch tabs; on return BGM resumes. Reload the page; BGM is silent until the next user gesture.
+**Independent Test**: Open the game, dismiss the start screen with a tap (the required user gesture), confirm the default BGM begins playing within 1 second. Hit a problem cube — within ~500 ms the audio swaps to the contest theme; the default BGM is no longer audible. Close the modal — within ~500 ms the audio swaps back to the default BGM. Open the Pause button → How-to-Play modal; audio fully pauses (neither track). Close it; audio resumes the default track. Switch tabs; on return audio resumes. Reload the page; audio is silent until the next user gesture.
 
 **Acceptance Scenarios**:
 
-1. **Given** the start screen is visible, **When** the player taps or presses any key to begin the run, **Then** background music begins playing within 1 second and continues to loop seamlessly.
-2. **Given** background music is playing during a run, **When** the player opens the Pause button → How-to-Play modal, **Then** the music pauses within 200 ms.
+1. **Given** the start screen is visible, **When** the player taps or presses any key to begin the run, **Then** the default BGM begins playing within 1 second and continues to loop seamlessly.
+2. **Given** the default BGM is playing during a run, **When** the player opens the Pause button → How-to-Play modal, **Then** the music pauses within 200 ms.
 3. **Given** the How-to-Play modal is open with music paused, **When** the player closes the modal, **Then** the music resumes from the exact position it paused at (no restart, no skip).
-4. **Given** background music is playing during a run, **When** the player hits a problem-gate cube and the gate modal opens, **Then** the music pauses; **When** the gate modal closes (correct, wrong, or timeout), **Then** the music resumes from where it stopped.
-5. **Given** background music is playing, **When** the browser tab loses focus, **Then** the music pauses (matching the existing pause-on-blur behaviour); **When** focus returns and the player presses a key, **Then** the music resumes.
-6. **Given** the page has just been loaded with no prior user interaction, **When** the page renders, **Then** no music plays (mobile autoplay policy is respected).
-7. **Given** the player reaches game-over, **When** the game-over overlay appears, **Then** background music stops (the game-over sound takes over — see US3).
+4. **Given** the default BGM is playing during a run, **When** the player hits a problem-gate cube and the gate modal opens, **Then** within ~500 ms the audio switches to the contest theme (default track stops or fades out; contest track starts).
+5. **Given** the contest theme is playing while the gate modal is open, **When** the gate modal closes for any reason (correct / wrong / timeout), **Then** within ~500 ms the audio switches back to the default BGM. The default BGM MAY restart from its loop point — exact position-preservation across the swap is NOT required (the swap is intentionally a "track change", not a "pause").
+6. **Given** background music is playing, **When** the browser tab loses focus, **Then** the music pauses (matching the existing pause-on-blur behaviour); **When** focus returns and the player presses a key, **Then** the music resumes the same track that was active at blur (default or contest).
+7. **Given** the page has just been loaded with no prior user interaction, **When** the page renders, **Then** no music plays (mobile autoplay policy is respected).
+8. **Given** the player reaches game-over, **When** the game-over overlay appears, **Then** all background music stops (the game-over SFX takes over — see US4).
 
 ---
 
@@ -115,7 +116,8 @@ A single mute button is rendered in the HUD, near the existing score / timer / l
 - **Page hidden via tab switch or minimise**: The existing pause-on-blur behaviour stops the world; this slice ensures the audio context also pauses so the player doesn't get phantom BGM coming from a hidden tab.
 - **Rapid lane-change spam (3+ key presses in 100 ms)**: Each successful lane-change start fires its blip. If the input adapter rejects a press (e.g., already at wall, or mid-animation), no sound plays for that press. Worst case: 3 distinct blips audible in quick succession; volume balance must prevent clipping.
 - **Simultaneous obstacle-hit AND game-over**: Last-life-obstacle-hit produces obstacle-hit + life-lost + game-over sounds layered. Playback order: obstacle-hit (instant), life-lost (instant or slight delay), game-over (after life-lost finishes is fine — total perceived duration ~2 s). All three may overlap.
-- **Mute during BGM mid-track**: BGM internally keeps playing under a zero-gain master; un-muting at any time resumes audibly without restarting the track. Implication: the BGM track is *not* stopped on mute (avoids the user-gesture replay requirement on un-mute).
+- **Mute during BGM mid-track**: BGM (whichever of default / contest is active) internally keeps playing under a zero-gain master; un-muting at any time resumes audibly without restarting the track. Implication: the BGM track is *not* stopped on mute (avoids the user-gesture replay requirement on un-mute).
+- **Rapid gate-on, gate-off, gate-on**: each transition completes within 500 ms. If the player triggers the second transition before the first finishes, the engine cancels the in-flight swap and starts the next one — no track-stacking, no double-playback.
 - **Countdown tick crosses second boundary at the exact moment of pick**: Tick may or may not play that final time. Both behaviours acceptable as long as no double-tick fires for the same second.
 - **Browser doesn't support Web Audio**: This is a constitution-level platform constraint — "modern evergreen browsers" all support Web Audio. Graceful degradation: a missing audio context means silent gameplay with no errors thrown.
 - **The player has system audio at 0%**: Not the game's problem; the in-game mute toggle is independent of system volume.
@@ -124,9 +126,11 @@ A single mute button is rendered in the HUD, near the existing score / timer / l
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST play a looping background-music track during an active run (loopState === 'running') and only then.
-- **FR-002**: The system MUST pause background music whenever the run is suspended (Pause-button modal, problem-gate modal, blur-driven pause) and resume from the same playback position when the run resumes.
-- **FR-003**: The system MUST stop background music when the run ends (game-over) and start it fresh from the loop beginning when a new run starts.
+- **FR-001**: The system MUST play a looping **default** background-music track while the run is active (loopState === 'running') AND no problem-gate modal is open.
+- **FR-001a**: The system MUST play a looping **contest** background-music track (different from the default — math-contest / battle-of-the-brains style) while a problem-gate modal is open. Track changes between default and contest MUST complete within ~500 ms of the modal opening or closing.
+- **FR-001b**: Position preservation IS required across pause / resume of the same track (FR-002); position preservation IS NOT required across the default ↔ contest swap — each track may restart from its own loop start when activated.
+- **FR-002**: The system MUST pause ALL background music whenever the run is suspended by a non-gate source (Pause-button → How-to-Play modal, blur-driven pause) and resume the same track that was active at pause from the same playback position.
+- **FR-003**: The system MUST stop all background music when the run ends (game-over) and start the default track fresh from its loop beginning when a new run starts.
 - **FR-004**: The system MUST play a distinct short sound effect for each of: (a) successful lane change start, (b) obstacle collision (excluding invincibility passes), (c) problem-cube collision, (d) correct answer, (e) life-loss (obstacle OR wrong-answer OR timeout), (f) game-over.
 - **FR-005**: The system MUST play a countdown tick once per visible second-boundary transition for the final 10 seconds of every problem-gate countdown; ticking MUST stop the instant the player answers or the countdown reaches zero.
 - **FR-006**: The system MUST NOT initiate any audio playback before the user's first interaction with the page; the first user gesture (tap, click, or keypress) unlocks audio.
@@ -134,7 +138,7 @@ A single mute button is rendered in the HUD, near the existing score / timer / l
 - **FR-008**: The mute state MUST persist across run boundaries within the same browser session but MUST reset to un-muted on page reload.
 - **FR-009**: The mute toggle's visual state MUST distinguish muted from un-muted without relying on colour alone (icon swap + `aria-label`).
 - **FR-010**: When muted, un-muting MUST resume background music audibly from its current playback position (i.e., the underlying BGM source continues running under a zero gain; mute is a master-gain switch, not a stop).
-- **FR-011**: Total audio asset weight MUST remain within the constitution's 5 MB total-asset budget. The background-music file alone MUST be ≤ 500 KB. Each SFX file SHOULD be ≤ 30 KB.
+- **FR-011**: Total audio asset weight MUST remain within the constitution's 5 MB total-asset budget. Each of the two BGM files (default + contest) MUST be ≤ 500 KB; combined BGM ≤ 1 MB. Each SFX file SHOULD be ≤ 30 KB. (Where SFX are generated procedurally — implementation decision — the per-SFX file budget is moot.)
 - **FR-012**: Significant audio state transitions (gesture-unlock, BGM start / pause / resume, mute toggle, SFX play failures) MUST emit structured `console.debug` events consistent with the project's observability convention.
 - **FR-013**: A missing or non-functional audio context MUST NOT throw user-visible errors; gameplay continues silently and a single debug-level warning is logged.
 - **FR-014**: SFX volume MUST be balanced so the BGM remains audible underneath (no SFX peak more than 6 dB above the BGM peak). Levels are tuned in implementation, not configured by the player.
@@ -155,7 +159,8 @@ A single mute button is rendered in the HUD, near the existing score / timer / l
 - **SC-004**: The countdown tick plays exactly 10 times during a problem-gate countdown that runs from full duration to expiry without interruption (one tick per second from `0:10` to `0:01` inclusive).
 - **SC-005**: Toggling mute silences ALL audio output (BGM + any in-progress SFX) within 200 ms.
 - **SC-006**: First-page-load with no user interaction produces zero audio output (mobile autoplay compliance verified on iOS Safari and Android Chrome).
-- **SC-007**: Total compressed audio asset weight is ≤ 5 MB; the BGM file alone is ≤ 500 KB.
+- **SC-007**: Total compressed audio asset weight is ≤ 5 MB; each BGM file (default + contest) is ≤ 500 KB.
+- **SC-009**: When a problem-gate modal opens, the audio switches from default to contest BGM within 500 ms; on close, switches back within 500 ms.
 - **SC-008**: A reload mid-run results in a clean reset — no music, no SFX, no state leakage.
 
 ## Assumptions

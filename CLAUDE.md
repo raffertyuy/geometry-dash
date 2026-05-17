@@ -61,16 +61,16 @@ Constraints to keep in mind:
 - `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
-**Active feature**: `008-how-to-play` — Replace the "Problem Credits" link on the start and game-over screens with a single "How to Play" link that opens a new three-section modal (General Rules / Problem Cubes / Credits). The Problem Cubes section renders one row per difficulty with a coloured swatch + label + description + point value + countdown. Credits inherits the CC-BY source list from the deleted `credits-panel` module. Also add a top-of-playfield **Pause button** that is rendered only while a run is in progress and enabled only when the run is actively running with no gate modal open and no respawn invincibility blinking. Pressing the button (or ESC / SPACE) pauses the run via the existing `pauseRun` reducer and opens the same How-to-Play modal in pause-mode; closing the modal (X / ESC / SPACE) calls `resumeRun`.
+**Active feature**: `009-audio` — Add a Web Audio engine with two looping BGM tracks (a calm tron-ambient default during running and a tense math-contest "battle of the brains" theme while a problem-gate modal is open — hard-cut swap, not a pause), procedural SFX (one OscillatorNode + GainNode envelope per event, zero asset bytes) for lane change / obstacle hit / problem-cube hit / correct answer / life lost / countdown tick / game over, a HUD mute button (also triggered by the `M` keyboard shortcut) implemented as a master-gain switch so un-muting never requires a fresh user gesture, and mobile-autoplay compliance via a gesture-latch that defers AudioContext creation until the first user input.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/008-how-to-play/plan.md` (technical context + constitution check + project tree)
-- `specs/008-how-to-play/spec.md` (user stories, requirements, success criteria)
-- `specs/008-how-to-play/research.md` (module-replacement decision, mode-as-closure-state, pause-button derivation, ESC/SPACE capture)
-- `specs/008-how-to-play/data-model.md` (`HowToPlayMode` + Pause-button derivation rules)
-- `specs/008-how-to-play/contracts/module-contracts.md` (new `how-to-play-modal` + `pause-button` modules; deleted `credits-panel`)
-- `specs/008-how-to-play/quickstart.md` (slice-specific validation steps)
+- `specs/009-audio/plan.md` (technical context + constitution check + project tree)
+- `specs/009-audio/spec.md` (user stories, requirements, success criteria)
+- `specs/009-audio/research.md` (procedural-SFX decision, dual-BGM sourcing, gesture-latch pattern, mute-as-master-gain rationale)
+- `specs/009-audio/data-model.md` (`SfxName` + `BgmTrack` + `AudioEngineState` + constants)
+- `specs/009-audio/contracts/module-contracts.md` (new `src/audio/` module + `pause-button`-shaped mute-button adapter + game-loop / input-adapter / problem-modal integration points)
+- `specs/009-audio/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture is captured in `specs/001-lane-runner/` through `specs/007-problem-timer/`. This slice replaces the existing credits panel with a richer tutorial modal and adds the first in-game pause affordance with a UI surface (separate from the existing pause-on-blur path).
+The foundational architecture is captured in `specs/001-lane-runner/` through `specs/008-how-to-play/`. This slice introduces the first audio subsystem; no new runtime dependencies — pure Web Audio API.
 <!-- SPECKIT END -->
