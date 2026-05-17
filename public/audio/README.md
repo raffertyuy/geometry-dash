@@ -22,4 +22,10 @@ The audio engine is content-agnostic — drop in any file at the same paths with
 
 ## SFX
 
-There are no SFX asset files. All seven sound effects (lane change, obstacle hit, gate hit, correct answer, life lost, game over, countdown tick) are synthesised procedurally at runtime by `src/audio/sfx-synth.ts`.
+| File | Plays when | Source |
+|------|-----------|--------|
+| `sfx/gate-hit.ogg` | Runner collides with a problem cube | "power_up_sound_v3" from "Power-Up Sound Effects" by Spring Spring (CC0) |
+
+Other sound effects (lane change, obstacle hit, correct answer, life lost, game over, countdown tick) are synthesised procedurally at runtime by `src/audio/sfx-synth.ts` — no asset files.
+
+The audio engine prefers a sampled SFX over the procedural recipe whenever a name is mapped in `AUDIO_SFX_ASSET_URLS` (`src/shared/config.ts`). To swap any other SFX from procedural to sampled, drop a file into `public/audio/sfx/` and add the path to that map.

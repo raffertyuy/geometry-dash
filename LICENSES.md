@@ -58,6 +58,19 @@ used under their respective Creative Commons licences. The files live at
   the author's request: "Battle Theme" by Wolfgang_ (Theodore Kerr),
   https://opengameart.org/content/battle-theme-0.
 
-All sound effects (lane change, obstacle hit, gate hit, correct answer, life
-lost, game over, countdown tick) are synthesised procedurally at runtime by
-`src/audio/sfx-synth.ts` and have no external source or licence.
+## sfx/gate-hit.ogg — Power Up Sound v3
+
+- **Original title**: power_up_sound_v3.ogg (from "Power-Up Sound Effects" pack)
+- **Author**: Spring Spring
+- **Source URL**: https://opengameart.org/content/power-up-sound-effects
+- **Licence**: CC0 1.0 Universal (public domain dedication),
+  https://creativecommons.org/publicdomain/zero/1.0/
+- **Modification**: None (used as-is, renamed `gate-hit.ogg`).
+- **Attribution**: Not required under CC0. Author requests courtesy
+  credit as "Spring Spring".
+
+Other sound effects (lane change, obstacle hit, correct answer, life lost,
+game over, countdown tick) are synthesised procedurally at runtime by
+`src/audio/sfx-synth.ts` and have no external source or licence. The audio
+engine prefers sampled SFX over procedural recipes when a sample is
+registered in `AUDIO_SFX_ASSET_URLS` (see `src/shared/config.ts`).

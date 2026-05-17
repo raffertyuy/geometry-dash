@@ -1,6 +1,8 @@
 import {
   AUDIO_BGM_URLS,
   AUDIO_MASTER_BASE_VOLUME,
+  AUDIO_SFX_ASSET_URLS,
+  AUDIO_SFX_BASE_VOLUME,
 } from '../shared/config';
 import { playSfx, type SfxName } from './sfx-synth';
 
@@ -32,6 +34,8 @@ export interface AudioEngine {
 export interface AudioEngineDeps {
   readonly createContext?: () => AudioContext;
   readonly fetchBgm?: (url: string) => Promise<ArrayBuffer>;
+  /** Optional separate fetcher for SFX assets; defaults to fetchBgm. */
+  readonly fetchSfx?: (url: string) => Promise<ArrayBuffer>;
   readonly win?: Window;
 }
 
@@ -52,6 +56,7 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
   const fetchBgm =
     deps.fetchBgm ??
     ((url: string) => fetch(url).then((r) => r.arrayBuffer()));
+  const fetchSfx = deps.fetchSfx ?? fetchBgm;
 
   let ctx: AudioContext | null = null;
   let masterGain: GainNode | null = null;
@@ -59,6 +64,7 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
     default: null,
     contest: null,
   };
+  const sfxBuffers: Map<string, AudioBuffer> = new Map();
   let bgmSource: AudioBufferSourceNode | null = null;
   let activeTrack: BgmTrack | null = null;
   let muted = false;
@@ -96,6 +102,28 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
       });
   }
 
+  function loadSfxAsset(name: string, url: string): Promise<void> {
+    const localCtx = ctx;
+    if (!localCtx) return Promise.resolve();
+    return fetchSfx(url)
+      .then((buf) => localCtx.decodeAudioData(buf))
+      .then((decoded) => {
+        sfxBuffers.set(name, decoded);
+        console.debug({
+          event: 'audio_sfx_asset_decoded',
+          name,
+          durationSec: decoded.duration,
+        });
+      })
+      .catch((err) => {
+        console.debug({
+          event: 'audio_sfx_asset_decode_failed',
+          name,
+          error: String(err),
+        });
+      });
+  }
+
   function unlock(): void {
     if (unlocked || destroyed || unavailable) return;
     try {
@@ -106,6 +134,9 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
       unlocked = true;
       void loadBgm('default');
       void loadBgm('contest');
+      for (const [name, url] of Object.entries(AUDIO_SFX_ASSET_URLS)) {
+        if (url) void loadSfxAsset(name, url);
+      }
       console.debug({ event: 'audio_unlocked' });
       if (pendingBgmStart !== null) {
         const t = pendingBgmStart;
@@ -140,8 +171,20 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
       return;
     }
     try {
+      const sample = sfxBuffers.get(name);
+      if (sample) {
+        const src = ctx.createBufferSource();
+        src.buffer = sample;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(AUDIO_SFX_BASE_VOLUME, ctx.currentTime);
+        src.connect(gain);
+        gain.connect(masterGain);
+        src.start();
+        console.debug({ event: 'audio_sfx_played', name, source: 'sample' });
+        return;
+      }
       playSfx(ctx, masterGain, name);
-      console.debug({ event: 'audio_sfx_played', name });
+      console.debug({ event: 'audio_sfx_played', name, source: 'synth' });
     } catch (err) {
       console.debug({ event: 'audio_sfx_failed', name, error: String(err) });
     }

@@ -94,6 +94,13 @@ export const AUDIO_BGM_URLS: Readonly<Record<'default' | 'contest', string>> = {
   contest: '/audio/bgm-contest.opus',
 };
 
+// Optional per-SFX asset URLs. When a name has an entry here, the audio
+// engine plays the sampled file instead of the procedural synth recipe.
+// SFX names absent from this map keep their procedural sound.
+export const AUDIO_SFX_ASSET_URLS: Readonly<Partial<Record<string, string>>> = {
+  'gate-hit': '/audio/sfx/gate-hit.ogg',
+};
+
 // Per-lane gate distribution. For every non-obstacle lane in a spawned
 // obstacle row, the spawner independently samples a uniform value from
 // {empty, B, M, A} weighted by these constants. The four values MUST sum
