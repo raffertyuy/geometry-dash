@@ -192,36 +192,35 @@ describe('createHowToPlayModal: General Rules section content', () => {
 });
 
 describe('createHowToPlayModal: Problem Cubes section content', () => {
-  it('renders exactly three cube rows in B / M / A order, each with a 3D cube carrying the GATE_CATALOGUE colour', () => {
+  it('renders exactly three cube rows in B / M / A order, each with a tron-style SVG cube icon carrying the GATE_CATALOGUE colour', () => {
     const modal = createHowToPlayModal(host, STUB_SOURCES);
     modal.show('entry');
     const rows = host.querySelectorAll('.htp-cube-row');
     expect(rows.length).toBe(3);
     const diffs = Array.from(rows).map((r) => r.getAttribute('data-difficulty'));
     expect(diffs).toEqual(['B', 'M', 'A']);
-    const cubes = host.querySelectorAll(
-      '.htp-cube-row .cube-3d',
+    const icons = host.querySelectorAll(
+      '.htp-cube-row .cube-icon',
     ) as NodeListOf<HTMLElement>;
-    expect(cubes.length).toBe(3);
-    // Per-row 3D cube carries the per-difficulty colour as an inline
-    // --cube-color custom property; each cube has 6 faces and 4 of them
-    // carry the "?" glyph.
-    expect(cubes[0]!.style.getPropertyValue('--cube-color')).toBe(
+    expect(icons.length).toBe(3);
+    // Per-row cube icon carries the per-difficulty colour as an inline
+    // --cube-color custom property; each icon contains exactly one SVG
+    // with the hexagonal outline + a "?" glyph.
+    expect(icons[0]!.style.getPropertyValue('--cube-color')).toBe(
       GATE_CATALOGUE.B.colorHex,
     );
-    expect(cubes[1]!.style.getPropertyValue('--cube-color')).toBe(
+    expect(icons[1]!.style.getPropertyValue('--cube-color')).toBe(
       GATE_CATALOGUE.M.colorHex,
     );
-    expect(cubes[2]!.style.getPropertyValue('--cube-color')).toBe(
+    expect(icons[2]!.style.getPropertyValue('--cube-color')).toBe(
       GATE_CATALOGUE.A.colorHex,
     );
-    for (const cube of Array.from(cubes)) {
-      expect(cube.querySelectorAll('.cube-3d__face').length).toBe(6);
-      const qmarks = cube.querySelectorAll('.cube-3d__qmark');
-      expect(qmarks.length).toBe(4);
-      for (const q of Array.from(qmarks)) {
-        expect(q.textContent).toBe('?');
-      }
+    for (const icon of Array.from(icons)) {
+      expect(icon.querySelector('svg')).not.toBeNull();
+      expect(icon.querySelector('polygon.cube-icon__outline')).not.toBeNull();
+      expect(icon.querySelector('.cube-icon__edges')).not.toBeNull();
+      const q = icon.querySelector('text.cube-icon__qmark');
+      expect(q?.textContent).toBe('?');
     }
   });
 
