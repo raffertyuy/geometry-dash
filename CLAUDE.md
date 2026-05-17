@@ -61,16 +61,16 @@ Constraints to keep in mind:
 - `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
-**Active feature**: `006-geometry-problems` — Replace the 15-per-difficulty placeholder problem pool from slice 005 with real geometry problems: ~100 hand-curated Basic problems sourced from OpenStax Contemporary Mathematics + Illustrative Mathematics (both CC BY 4.0); ~12-15 parameterised Medium templates and ~10-15 parameterised Advanced templates that compute the correct answer + plausible distractors algorithmically and emit a parameterised inline SVG diagram in the modal's reserved `.problem-figure` slot. Unicode-only equation rendering (no KaTeX — would break the 500 KB budget). CC-BY attribution via `LICENSES.md` at repo root + an in-app "Problem credits" panel reachable from start / game-over screens.
+**Active feature**: `007-problem-timer` — Add a visible per-question countdown to the problem-gate modal. Basic = 60 s, Medium = 120 s, Advanced = 180 s. Timeouts route through the existing wrong-answer pipeline (lose the difficulty's points, lose a life, correct answer highlighted in review state, 3-second auto-continue, respawn invincibility) — no new penalty, no special case. Countdown is wall-clock-driven via `performance.now()` so background-tab throttling cannot grant extra time. The modal's `onResolve` callback contract widens from a bare `choiceIndex` to a tagged `AnswerResult` union so timeouts are first-class. Last 10 seconds adopt an urgent visual state (red + `Hurry!` label + pulse) per the constitution's no-colour-alone rule.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/006-geometry-problems/plan.md` (technical context + constitution check + project tree)
-- `specs/006-geometry-problems/spec.md` (user stories, requirements, success criteria)
-- `specs/006-geometry-problems/research.md` (Phase 0 decisions for this slice)
-- `specs/006-geometry-problems/data-model.md` (Problem extension + ProblemSource + Template shape + SVG archetype shape)
-- `specs/006-geometry-problems/contracts/module-contracts.md` (new `src/diagrams/` module + expanded `src/problems/` internals + new `credits-panel` renderer adapter + modal figure-injection extension)
-- `specs/006-geometry-problems/quickstart.md` (slice-specific validation steps)
+- `specs/007-problem-timer/plan.md` (technical context + constitution check + project tree)
+- `specs/007-problem-timer/spec.md` (user stories, requirements, success criteria)
+- `specs/007-problem-timer/research.md` (Phase 0 decisions for this slice)
+- `specs/007-problem-timer/data-model.md` (`AnswerResult` + `QuestionTimerState` + constants)
+- `specs/007-problem-timer/contracts/module-contracts.md` (updated `ProblemModal.show` contract + game-loop handler + debug-overlay extension)
+- `specs/007-problem-timer/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture is captured in `specs/001-lane-runner/` through `specs/005-problem-gates/`. This slice replaces placeholder content with real, attributed geometry problems and introduces the project's first **parameterised SVG diagram pipeline** + **CC-BY attribution surface**.
+The foundational architecture is captured in `specs/001-lane-runner/` through `specs/006-geometry-problems/`. This slice is a small UX layer over the existing problem-gate modal: no new module, no new dependency, ~100 net source lines plus tests.
 <!-- SPECKIT END -->
