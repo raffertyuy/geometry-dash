@@ -12,10 +12,18 @@ import type {
   GateDifficulty,
   Lane,
   PlayerState,
+  Problem,
   ProblemGate,
 } from '../shared/types';
 
 const ALL_LANES: readonly Lane[] = ['left', 'centre', 'right'];
+
+// Anti-repeat tunables. We keep a small ring buffer of the most-recently
+// spawned problem ids PER DIFFICULTY and re-roll if the next sample falls
+// back into it. RESAMPLE attempts are bounded so a pathological seed can't
+// loop forever — on the last attempt we accept the duplicate.
+const RECENT_PROBLEM_BUFFER_SIZE = 3;
+const MAX_RESAMPLE_ATTEMPTS = 4;
 
 /**
  * Neon-palette catalogue keyed by gate difficulty. Each colour has at
@@ -42,10 +50,17 @@ export const GATE_CATALOGUE: Readonly<
 export interface GateSpawnState {
   readonly seed: number;
   readonly lastSpawnedGateId: number;
+  /** Per-difficulty FIFO of recently spawned problem ids. Used to suppress
+   *  back-to-back duplicates within a short window. */
+  readonly recentProblemIds: Readonly<Record<GateDifficulty, readonly string[]>>;
 }
 
 export function createGateSpawnState(initialSeed: number): GateSpawnState {
-  return { seed: initialSeed, lastSpawnedGateId: 0 };
+  return {
+    seed: initialSeed,
+    lastSpawnedGateId: 0,
+    recentProblemIds: { B: [], M: [], A: [] },
+  };
 }
 
 /**
@@ -96,6 +111,11 @@ export function augmentRowWithGates(
   const blocked = new Set(blockedLanes);
   let seed = state.seed;
   let nextId = state.lastSpawnedGateId;
+  const recent: Record<GateDifficulty, string[]> = {
+    B: [...state.recentProblemIds.B],
+    M: [...state.recentProblemIds.M],
+    A: [...state.recentProblemIds.A],
+  };
   const gates: ProblemGate[] = [];
 
   for (const lane of ALL_LANES) {
@@ -107,17 +127,34 @@ export function augmentRowWithGates(
     const difficulty = pickDifficulty(decideRoll.value);
     if (difficulty === null) continue;
 
-    // Draw 2: pick a problem within the difficulty's pool.
-    const problemRoll = mulberry32Step(seed);
-    seed = problemRoll.nextSeed;
-    const problem = selectPlaceholderProblem(difficulty, problemRoll.value);
+    // Draw 2..N: pick a problem within the difficulty's pool, re-rolling
+    // if we just spawned the same problem id within the recent window.
+    let problem: Problem | null = null;
+    for (let attempt = 0; attempt <= MAX_RESAMPLE_ATTEMPTS; attempt++) {
+      const problemRoll = mulberry32Step(seed);
+      seed = problemRoll.nextSeed;
+      const candidate = selectPlaceholderProblem(difficulty, problemRoll.value);
+      const isRecent = recent[difficulty].includes(candidate.id);
+      if (!isRecent || attempt === MAX_RESAMPLE_ATTEMPTS) {
+        problem = candidate;
+        break;
+      }
+    }
+    // problem is guaranteed non-null: the loop runs at least once and
+    // always assigns on the final attempt.
+    const picked = problem!;
+
+    // Push the picked id into the recent FIFO (per difficulty).
+    const buf = recent[difficulty];
+    buf.push(picked.id);
+    while (buf.length > RECENT_PROBLEM_BUFFER_SIZE) buf.shift();
 
     nextId += 1;
     const gate: ProblemGate = {
       id: nextId,
       difficulty,
       lane,
-      problem,
+      problem: picked,
       worldZ,
       previousWorldZ: worldZ,
     };
@@ -128,13 +165,18 @@ export function augmentRowWithGates(
       id: gate.id,
       lane: gate.lane,
       difficulty: gate.difficulty,
+      problemId: picked.id,
       worldZ: gate.worldZ,
     });
   }
 
   return {
     gates,
-    state: { seed, lastSpawnedGateId: nextId },
+    state: {
+      seed,
+      lastSpawnedGateId: nextId,
+      recentProblemIds: { B: recent.B, M: recent.M, A: recent.A },
+    },
   };
 }
 
