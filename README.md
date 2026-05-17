@@ -2,6 +2,8 @@
 
 A 3D, Tron-themed, Subway-Surfers-style endless runner where the obstacle field is punctuated by **problem gates** — glowing Rubik's-cube collidables that pause the run and ask a multiple-choice question. Built as a static web app with TypeScript + Three.js + Vite.
 
+**Play it live**: [trgd.raztype.com](https://trgd.raztype.com) (hosted on Cloudflare Workers + Static Assets)
+
 > [!IMPORTANT]
 > **This project is 100% vibe-coded.** Every spec, plan, task list, test, and line of code was generated through a conversation with [Claude](https://www.anthropic.com/claude) using the [GitHub Spec Kit](https://github.com/github/spec-kit) workflow. A human guided design decisions in plain English; the AI wrote everything. The `specs/NNN-*/` folders are deliberately preserved as a record of how each feature was specified and built — they're useful if you're studying spec-driven AI development end to end.
 
