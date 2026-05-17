@@ -19,6 +19,7 @@ function makeStubCtx(): AudioContext {
   let oscCount = 0;
   const ctx = {
     currentTime: 0,
+    sampleRate: 48000,
     createOscillator: (): StubOsc => {
       oscCount += 1;
       return {
@@ -43,6 +44,21 @@ function makeStubCtx(): AudioContext {
       },
       connect: () => undefined,
       disconnect: () => undefined,
+    }),
+    createBufferSource: () => ({
+      buffer: null,
+      loop: false,
+      connect: () => undefined,
+      disconnect: () => undefined,
+      start: () => undefined,
+      stop: () => undefined,
+    }),
+    createBuffer: (channels: number, length: number) => ({
+      length,
+      duration: length / 48000,
+      sampleRate: 48000,
+      numberOfChannels: channels,
+      getChannelData: () => new Float32Array(length),
     }),
     get oscCount() {
       return oscCount;

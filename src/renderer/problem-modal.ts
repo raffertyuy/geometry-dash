@@ -58,6 +58,13 @@ let autoContinuePref = false;
  */
 export interface ProblemModalDeps {
   readonly onCountdownTick?: () => void;
+  /**
+   * Fired the instant the player commits — pick OR timeout — BEFORE the
+   * review-state auto-continue countdown starts. `isCorrect` is computed
+   * by the modal against the current problem. Used for the answer SFX so
+   * the audio feedback is immediate, not delayed until Continue.
+   */
+  readonly onAnswerCommitted?: (isCorrect: boolean) => void;
 }
 
 export function createProblemModal(
@@ -208,6 +215,7 @@ export function createProblemModal(
     state = 'reviewing';
     pickedIndex = null;
     syncReviewingFeedback();
+    deps.onAnswerCommitted?.(false); // timeout is always wrong
     startCountdown();
   }
 
@@ -371,6 +379,9 @@ export function createProblemModal(
     stopQuestionTimer('stopped-by-answer');
     state = 'reviewing';
     syncReviewingFeedback();
+    if (currentProblem) {
+      deps.onAnswerCommitted?.(choiceIndex === currentProblem.correctIndex);
+    }
     startCountdown();
   }
 

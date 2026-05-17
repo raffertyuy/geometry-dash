@@ -9,7 +9,12 @@ Two looping BGM tracks served as static assets.
 
 ## Status
 
-**Placeholders.** The current files are `ffmpeg`-generated synth loops (a soft dual-sine pad for default, a pulsed alternating-tone pattern for contest) committed so the audio engine has something to decode during development. They are NOT the final tracks.
+**Placeholders.** The current files are `ffmpeg`-generated synth loops committed so the audio engine has something to decode during development.
+
+- `bgm-default.opus` — 24 s loop: 120-BPM bass kick + low-pass synth bass + a vibrato-modulated lead. Aims for a tron-racing techno feel.
+- `bgm-contest.opus` — 20 s loop: 4 Hz ticking percussion + a swung-arpeggio carrier + low pulse bass + a high vibrato lead. Aims for a futuristic quiz-show / "you're under pressure" feel.
+
+They are NOT the final tracks.
 
 ## Sourcing the real tracks
 

@@ -164,6 +164,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   const livesHud: LivesHud = createLivesHud(host.livesHud);
   const problemModal: ProblemModal = createProblemModal(host.problemModal, {
     onCountdownTick: () => audioEngine.play('countdown-tick'),
+    onAnswerCommitted: (isCorrect) =>
+      audioEngine.play(isCorrect ? 'correct-answer' : 'life-lost'),
   });
   const floatingScore: FloatingScore = createFloatingScore(host.floatingScores);
   function resumeFromPauseButton(): void {
@@ -317,7 +319,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
         isCorrect ? `+${points}` : `-${points}`,
         isCorrect ? 'green' : 'red',
       );
-      audioEngine.play(isCorrect ? 'correct-answer' : 'life-lost');
+      // Note: answer SFX already played on commit via onAnswerCommitted
+      // (modal deps). Don't double-play it here.
       // Push the new lives count to the HUD immediately so the player
       // sees the deduction even when game-over fires on the same tick
       // and short-circuits the per-frame HUD update.
