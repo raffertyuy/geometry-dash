@@ -112,10 +112,13 @@ const GATE_POOL_SIZE = 12;
 // blocks. Same for all gates so they read as a single visual category.
 const GATE_TILT_X = -0.42; // forward tilt (radians) - shows top face
 const GATE_TILT_Y = 0.62; // side turn (radians) - shows right face
-const GATE_BOB_AMPLITUDE = 0.08; // world units of vertical hover travel
+const GATE_BOB_AMPLITUDE = 0.10; // world units of vertical hover travel
 const GATE_BOB_PERIOD_MS = 1400;
 const GATE_SPIN_PERIOD_MS = 9000; // slow constant Y-spin for "alive" feel
-const GATE_TWINKLE_PERIOD_MS = 1200; // emissive pulse cycle
+const GATE_TWINKLE_PERIOD_MS = 1200; // primary emissive pulse cycle
+const GATE_SHIMMER_PERIOD_MS = 200; // fast secondary shimmer overlay
+const GATE_HALO_SCALE = 2.6; // outer-glow halo size relative to cube
+const GATE_QMARK_SCALE = 1.05; // question-mark sprite size relative to cube
 
 const OBSTACLE_POOL_SIZE = 12;
 const OBSTACLE_HEIGHTS: Readonly<Record<ObstacleVariantId, number>> = {
@@ -529,27 +532,28 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   // power-up sparkle.
 
   // Procedural "?" canvas texture. Drawn once at boot, shared across all
-  // gates. White glyph on transparent background; the gate's body shows
-  // through everywhere except the glyph itself.
+  // gates. White glyph with a dark outline so it reads against any cube
+  // colour; transparent background lets the cube body show through.
   function makeQuestionMarkTexture(): THREE.CanvasTexture {
-    const size = 128;
+    const size = 256;
     const c = document.createElement('canvas');
     c.width = size;
     c.height = size;
     const ctx = c.getContext('2d');
     if (ctx) {
       ctx.clearRect(0, 0, size, size);
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = 'rgba(20, 28, 48, 0.7)';
-      ctx.lineWidth = 6;
       ctx.font =
-        'bold 96px ui-monospace, SFMono-Regular, "Courier New", monospace';
+        'bold 200px ui-monospace, SFMono-Regular, "Courier New", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // Strokes first so the white glyph sits on top of a dark outline -
-      // keeps the "?" readable against the brighter cube faces.
-      ctx.strokeText('?', size / 2, size / 2 + 4);
-      ctx.fillText('?', size / 2, size / 2 + 4);
+      // Dark stroke first as a halo behind the white fill - keeps the "?"
+      // readable on bright bloomed faces.
+      ctx.strokeStyle = 'rgba(8, 12, 24, 0.85)';
+      ctx.lineWidth = 14;
+      ctx.lineJoin = 'round';
+      ctx.strokeText('?', size / 2, size / 2 + 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('?', size / 2, size / 2 + 8);
     }
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -559,6 +563,34 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     return tex;
   }
   const questionMarkTexture = makeQuestionMarkTexture();
+
+  // Radial-gradient halo texture. White at the centre, fading to fully
+  // transparent at the edge. Used with AdditiveBlending so the halo
+  // bleeds light around the cube and pulses with the twinkle.
+  function makeHaloTexture(): THREE.CanvasTexture {
+    const size = 256;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      const cx = size / 2;
+      const cy = size / 2;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx);
+      grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+      grad.addColorStop(0.25, 'rgba(255, 255, 255, 0.55)');
+      grad.addColorStop(0.55, 'rgba(255, 255, 255, 0.18)');
+      grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    return tex;
+  }
+  const haloTexture = makeHaloTexture();
 
   const gateGeometry = new THREE.BoxGeometry(GATE_SIZE, GATE_SIZE, GATE_SIZE);
   // Simple 12-edge outline (no internal grid) using EdgesGeometry.
@@ -609,22 +641,49 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     A: makeGateEdgeMaterial('A'),
   };
 
-  // Shared sprite material for the camera-facing "?" decal. Same across all
-  // gates and difficulties - the glyph identity is universal; the cube
-  // colour conveys difficulty.
+  // Shared sprite material for the camera-facing "?" decal. depthTest is
+  // disabled so the glyph always renders on top of the cube body and
+  // edges (otherwise the body's translucent fragments occlude it
+  // depending on view angle). renderOrder 5 puts the sprite after the
+  // body + edges in the draw queue.
   const gateSpriteMaterial = new THREE.SpriteMaterial({
     map: questionMarkTexture,
     transparent: true,
     toneMapped: false,
     color: 0xffffff,
     depthWrite: false,
+    depthTest: false,
   });
+
+  // Halo material. AdditiveBlending so the glow stacks on whatever is
+  // behind it (the scene's dark ground + bloom). Per-difficulty colour
+  // so the halo bleeds the same hue as the cube body. depthTest disabled
+  // so the halo never gets clipped by other gates / obstacles in front.
+  function makeGateHaloMaterial(d: GateDifficulty): THREE.SpriteMaterial {
+    const color = gateColorHexToNumber(GATE_CATALOGUE[d].colorHex);
+    return new THREE.SpriteMaterial({
+      map: haloTexture,
+      transparent: true,
+      toneMapped: false,
+      color,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+      opacity: 0.55,
+    });
+  }
+  const gateHaloMaterials: Readonly<Record<GateDifficulty, THREE.SpriteMaterial>> = {
+    B: makeGateHaloMaterial('B'),
+    M: makeGateHaloMaterial('M'),
+    A: makeGateHaloMaterial('A'),
+  };
 
   interface GateSlot {
     readonly group: THREE.Group;
     readonly body: THREE.Mesh;
     readonly edges: LineSegments2;
     readonly sprite: THREE.Sprite;
+    readonly halo: THREE.Sprite;
   }
 
   const gatePool: GateSlot[] = [];
@@ -632,26 +691,46 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     const grp = new THREE.Group();
     const body = new THREE.Mesh(gateGeometry, gateBodyMaterials.B);
     const edges = new LineSegments2(gateEdgeGeometry, gateEdgeMaterials.B);
+    const halo = new THREE.Sprite(gateHaloMaterials.B);
+    halo.scale.set(GATE_SIZE * GATE_HALO_SCALE, GATE_SIZE * GATE_HALO_SCALE, 1);
+    halo.renderOrder = -1; // behind cube body, halo lights up from "outside"
     const sprite = new THREE.Sprite(gateSpriteMaterial);
-    sprite.scale.set(GATE_SIZE * 0.85, GATE_SIZE * 0.85, 1);
+    sprite.scale.set(GATE_SIZE * GATE_QMARK_SCALE, GATE_SIZE * GATE_QMARK_SCALE, 1);
+    sprite.renderOrder = 5; // on top of body + edges so the "?" always shows
+    grp.add(halo);
     grp.add(body);
     grp.add(edges);
     grp.add(sprite);
     grp.visible = false;
     scene.add(grp);
-    gatePool.push({ group: grp, body, edges, sprite });
+    gatePool.push({ group: grp, body, edges, sprite, halo });
   }
 
   function updateGates(gates: readonly ProblemGate[], tickMs = 0): void {
-    // Sparkle: synchronously pulse all three gate-body materials' emissive
-    // intensity. Time-base is world.tickMs so the pulse freezes during a
-    // modal-open ('answering') frame - the world is paused, the gate
-    // should look paused too.
-    const twinklePhase = (tickMs % GATE_TWINKLE_PERIOD_MS) / GATE_TWINKLE_PERIOD_MS;
-    const twinkle = 0.55 + 0.35 * Math.sin(twinklePhase * Math.PI * 2);
-    gateBodyMaterials.B.emissiveIntensity = twinkle;
-    gateBodyMaterials.M.emissiveIntensity = twinkle;
-    gateBodyMaterials.A.emissiveIntensity = twinkle;
+    // Sparkle: a slow base pulse + a fast sharp-peaked shimmer overlay
+    // gives the cube a "breathing + occasionally twinkling" feel rather
+    // than a monotonic sine throb. Time-base is world.tickMs so the
+    // pulse freezes during a modal-open ('answering') frame - the world
+    // is paused, the gate should look paused too.
+    const slowPhase =
+      (tickMs % GATE_TWINKLE_PERIOD_MS) / GATE_TWINKLE_PERIOD_MS;
+    const fastPhase =
+      (tickMs % GATE_SHIMMER_PERIOD_MS) / GATE_SHIMMER_PERIOD_MS;
+    const slowPulse = 0.5 * (1 + Math.sin(slowPhase * Math.PI * 2));
+    // Sharp peak: |sin|^8 stays near 0 most of the cycle, then spikes.
+    const shimmerPeak = Math.pow(
+      Math.abs(Math.sin(fastPhase * Math.PI)),
+      8,
+    );
+    const emissive = 0.7 + 0.7 * slowPulse + 0.4 * shimmerPeak;
+    const haloOpacity = 0.35 + 0.45 * slowPulse + 0.3 * shimmerPeak;
+
+    gateBodyMaterials.B.emissiveIntensity = emissive;
+    gateBodyMaterials.M.emissiveIntensity = emissive;
+    gateBodyMaterials.A.emissiveIntensity = emissive;
+    gateHaloMaterials.B.opacity = haloOpacity;
+    gateHaloMaterials.M.opacity = haloOpacity;
+    gateHaloMaterials.A.opacity = haloOpacity;
 
     let used = 0;
     for (const g of gates) {
@@ -679,13 +758,14 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
         0,
       );
 
-      // The sprite is camera-facing, so it inherits its world rotation
-      // from the camera, not the group - reset its local position to the
-      // group's centre.
+      // Halo + "?" sprite are camera-facing: reset their local positions
+      // to the group's centre so they stay locked to the cube.
+      slot.halo.position.set(0, 0, 0);
       slot.sprite.position.set(0, 0, 0);
 
       slot.body.material = gateBodyMaterials[g.difficulty];
       slot.edges.material = gateEdgeMaterials[g.difficulty];
+      slot.halo.material = gateHaloMaterials[g.difficulty];
       slot.group.visible = true;
       used++;
     }
