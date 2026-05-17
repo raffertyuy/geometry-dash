@@ -142,6 +142,12 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   let loopState: LoopState = 'start-screen';
   let isAwaitingResume = false;
   let isAwaitingRestart = false;
+  // Browsers block all audio playback until the player has interacted at
+  // least once. We split the start-screen entry into two steps: the first
+  // gesture unlocks audio + starts BGM and updates the start-screen hint;
+  // the second gesture begins the run. This way the player gets to hear
+  // the music on the start screen — required by feature 009.
+  let isStartScreenAudioPrimed = false;
   let obstacles: ObstacleGroup[] = [];
   let gates: ProblemGate[] = [];
   let spawnSchedule: ObstacleSpawnSchedule = createSpawnSchedule(freshSeed());
@@ -232,11 +238,24 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     host.gameOverOverlay.classList.toggle('hidden', !visible);
   }
 
+  function primeStartScreenAudio(): void {
+    isStartScreenAudioPrimed = true;
+    audioEngine.startBgm('default');
+    // Update the start-screen hint so the player knows their input was
+    // received and another tap will now begin the run.
+    host.startScreen.classList.add('is-audio-primed');
+  }
+
   function beginRun(): void {
     loopState = 'running';
     world = startRun(world);
+    host.startScreen.classList.remove('is-audio-primed');
     showStartScreen(false);
-    audioEngine.startBgm('default');
+    if (!isStartScreenAudioPrimed) {
+      // Defensive — if beginRun is invoked from a code path that bypassed
+      // the two-step prime (e.g., future automation), start BGM now.
+      audioEngine.startBgm('default');
+    }
   }
 
   function triggerGameOver(): void {
@@ -357,7 +376,11 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     // restart the run behind it.
     if (howToPlayModal.isVisible()) return;
     if (loopState === 'start-screen') {
-      beginRun();
+      if (!isStartScreenAudioPrimed) {
+        primeStartScreenAudio();
+      } else {
+        beginRun();
+      }
       return; // do not also drive lane-state with the press that started the run
     }
     if (isAwaitingRestart) {
@@ -390,7 +413,11 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     // hits; the game-loop should not also start or restart the run.
     if (howToPlayModal.isVisible()) return;
     if (loopState === 'start-screen') {
-      beginRun();
+      if (!isStartScreenAudioPrimed) {
+        primeStartScreenAudio();
+      } else {
+        beginRun();
+      }
       return;
     }
     if (isAwaitingRestart) {
