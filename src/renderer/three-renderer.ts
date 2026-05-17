@@ -146,6 +146,15 @@ const GATE_QMARK_SCALE = 1.05; // question-mark sprite size relative to cube
 // cubes read at roughly the same visual brightness. Red is the
 // baseline at 1.0; the others get dampened.
 
+// Distance-fade range for cube glow. Bloom + tiny-on-screen distant
+// cubes = nuclear bright dots. Fade the emissive + halo by distance
+// so far cubes look right too. Player is at z=0; spawn at z=-34;
+// cull at z=14. Cubes fade as |worldZ| grows beyond NEAR; at FAR
+// (or beyond) they sit at the MIN floor.
+const GATE_GLOW_NEAR_DISTANCE = 6; // within this many units of player: full glow
+const GATE_GLOW_FAR_DISTANCE = 28; // at this distance: clamped to MIN
+const GATE_GLOW_FAR_MIN = 0.3; // glow factor at max distance
+
 const OBSTACLE_POOL_SIZE = 12;
 const OBSTACLE_HEIGHTS: Readonly<Record<ObstacleVariantId, number>> = {
   cube: 1.4,
@@ -718,17 +727,26 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   interface GateSlot {
     readonly group: THREE.Group;
     readonly body: THREE.Mesh;
+    readonly bodyMat: THREE.MeshStandardMaterial; // per-slot clone
     readonly edges: LineSegments2;
     readonly sprite: THREE.Sprite;
     readonly halo: THREE.Sprite;
+    readonly haloMat: THREE.SpriteMaterial; // per-slot clone
   }
 
+  // Body + halo materials are CLONED per slot so each gate can have its
+  // own distance-faded emissive intensity / halo opacity. Edge materials
+  // and the "?" sprite material stay shared (no per-gate variation
+  // needed - the bright edge IS the silhouette, distance-fading it would
+  // make far cubes invisible).
   const gatePool: GateSlot[] = [];
   for (let i = 0; i < GATE_POOL_SIZE; i++) {
     const grp = new THREE.Group();
-    const body = new THREE.Mesh(gateGeometry, gateBodyMaterials.B);
+    const bodyMat = gateBodyMaterials.B.clone();
+    const haloMat = gateHaloMaterials.B.clone();
+    const body = new THREE.Mesh(gateGeometry, bodyMat);
     const edges = new LineSegments2(gateEdgeGeometry, gateEdgeMaterials.B);
-    const halo = new THREE.Sprite(gateHaloMaterials.B);
+    const halo = new THREE.Sprite(haloMat);
     halo.scale.set(GATE_SIZE * GATE_HALO_SCALE, GATE_SIZE * GATE_HALO_SCALE, 1);
     halo.renderOrder = -1; // behind cube body, halo lights up from "outside"
     const sprite = new THREE.Sprite(gateSpriteMaterial);
@@ -740,7 +758,7 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     grp.add(sprite);
     grp.visible = false;
     scene.add(grp);
-    gatePool.push({ group: grp, body, edges, sprite, halo });
+    gatePool.push({ group: grp, body, bodyMat, edges, sprite, halo, haloMat });
   }
 
   function updateGates(gates: readonly ProblemGate[], tickMs = 0): void {
@@ -764,16 +782,6 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     // Wide ranges so the dim feels properly dim and the peak pops.
     const emissive = 0.4 + 1.2 * intensity01; // [0.4, 1.6]
     const haloOpacity = 0.2 + 0.7 * intensity01; // [0.2, 0.9]
-
-    // Apply the per-difficulty glow scale to both emissive intensity
-    // and halo opacity so the three cubes read at perceptually equal
-    // brightness even though their hex luminance differs by ~2×.
-    gateBodyMaterials.B.emissiveIntensity = emissive * GATE_GLOW_SCALE.B;
-    gateBodyMaterials.M.emissiveIntensity = emissive * GATE_GLOW_SCALE.M;
-    gateBodyMaterials.A.emissiveIntensity = emissive * GATE_GLOW_SCALE.A;
-    gateHaloMaterials.B.opacity = haloOpacity * GATE_GLOW_SCALE.B;
-    gateHaloMaterials.M.opacity = haloOpacity * GATE_GLOW_SCALE.M;
-    gateHaloMaterials.A.opacity = haloOpacity * GATE_GLOW_SCALE.A;
 
     let used = 0;
     for (const g of gates) {
@@ -806,9 +814,39 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
       slot.halo.position.set(0, 0, 0);
       slot.sprite.position.set(0, 0, 0);
 
-      slot.body.material = gateBodyMaterials[g.difficulty];
+      // Distance fade: dampen the glow on far cubes so bloom on a
+      // tiny-on-screen object doesn't turn the cube into a nuclear dot.
+      // Player is at z=0; a freshly-spawned cube is at z=-34. Inside the
+      // NEAR distance the glow is at full strength; from NEAR to FAR it
+      // ramps down linearly to FAR_MIN.
+      const dist = Math.abs(g.worldZ);
+      const ramp = Math.min(
+        1,
+        Math.max(
+          0,
+          (dist - GATE_GLOW_NEAR_DISTANCE) /
+            (GATE_GLOW_FAR_DISTANCE - GATE_GLOW_NEAR_DISTANCE),
+        ),
+      );
+      // ramp = 0 (near) -> distFade = 1.0;  ramp = 1 (far) -> distFade = FAR_MIN
+      const distFade = 1 - (1 - GATE_GLOW_FAR_MIN) * ramp;
+
+      // Copy template colour into the per-slot material (cheap: just two
+      // Color.copy calls), then apply the per-difficulty glow scale and
+      // the distance fade. Both emissive intensity and halo opacity scale
+      // together so the cube looks consistent across viewing distance.
+      const bodyTemplate = gateBodyMaterials[g.difficulty];
+      slot.bodyMat.color.copy(bodyTemplate.color);
+      slot.bodyMat.emissive.copy(bodyTemplate.emissive);
+      slot.bodyMat.emissiveIntensity =
+        emissive * GATE_GLOW_SCALE[g.difficulty] * distFade;
+
+      const haloTemplate = gateHaloMaterials[g.difficulty];
+      slot.haloMat.color.copy(haloTemplate.color);
+      slot.haloMat.opacity =
+        haloOpacity * GATE_GLOW_SCALE[g.difficulty] * distFade;
+
       slot.edges.material = gateEdgeMaterials[g.difficulty];
-      slot.halo.material = gateHaloMaterials[g.difficulty];
       slot.group.visible = true;
       used++;
     }
