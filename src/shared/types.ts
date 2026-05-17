@@ -43,6 +43,11 @@ export interface Problem {
   readonly prompt: string;
   readonly choices: readonly [AnswerChoice, AnswerChoice, AnswerChoice];
   readonly correctIndex: 0 | 1 | 2;
+  /** Inline SVG markup for templated M/A problems with geometric figures.
+      Optional: undefined for B problems and for templates without figures. */
+  readonly figure?: string;
+  /** Source identifier matching a ProblemSource.id, for CC-BY-curated B problems. */
+  readonly sourceRef?: string;
 }
 
 /**
