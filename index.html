@@ -203,11 +203,28 @@
       }
 
       #problem-modal .problem-text {
-        font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+        font-size: clamp(1.1rem, 3vw, 1.6rem);
         font-weight: 600;
-        max-width: min(90vw, 640px);
+        max-width: min(94vw, 760px);
         color: #e8e8ef;
-        line-height: 1.35;
+        line-height: 1.4;
+      }
+
+      /* Reserved slot for future geometry diagrams (SVG primitives or a
+         pre-rendered figure). Currently empty - shown when populated.
+         Sized to comfortably hold ~280 px wide diagrams alongside the
+         question text without overflowing the modal panel. */
+      #problem-modal .problem-figure {
+        max-width: min(94vw, 720px);
+        max-height: 40vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #e8e8ef;
+      }
+
+      #problem-modal .problem-figure:empty {
+        display: none;
       }
 
       #problem-modal .answer-choices {
@@ -217,7 +234,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        width: min(86vw, 480px);
+        width: min(94vw, 560px);
       }
 
       #problem-modal .answer-choice {

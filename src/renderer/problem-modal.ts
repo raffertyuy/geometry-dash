@@ -68,6 +68,14 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     prompt.textContent = problem.prompt;
     host.appendChild(prompt);
 
+    // Reserved slot for a geometry diagram. Left empty for the current
+    // placeholder-problem pool; future slices that add real problems with
+    // SVG figures will populate this element. CSS hides it via :empty so
+    // text-only problems don't get a stray box.
+    const figure = doc.createElement('div');
+    figure.className = 'problem-figure';
+    host.appendChild(figure);
+
     const list = doc.createElement('ul');
     list.className = 'answer-choices';
     choiceElements = [];

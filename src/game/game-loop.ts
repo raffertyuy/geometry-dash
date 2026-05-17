@@ -434,7 +434,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     }
 
     renderer.updateObstacles(obstacles);
-    renderer.updateGates(gates);
+    renderer.updateGates(gates, world.tickMs);
     renderer.draw(player, world);
     debugOverlay.update(player, world, lastInput);
     livesHud.set(world.lives);

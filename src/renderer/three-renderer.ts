@@ -91,7 +91,7 @@ export interface ThreeRenderer {
   draw(player: PlayerState, world: WorldState): void;
   resize(widthPx: number, heightPx: number): void;
   updateObstacles(groups: readonly ObstacleGroup[]): void;
-  updateGates(gates: readonly ProblemGate[]): void;
+  updateGates(gates: readonly ProblemGate[], tickMs?: number): void;
   /**
    * Resets per-run internal state (cached distance baseline, scrolling-rung
    * positions, speed-line positions, trail buffer). Must be called by the
@@ -104,9 +104,18 @@ export interface ThreeRenderer {
   destroy(): void;
 }
 
-const GATE_SIZE = 1.3;
-const GATE_FLOAT_Y = 1.1;
+const GATE_SIZE = 0.9;
+const GATE_FLOAT_Y = 1.2;
 const GATE_POOL_SIZE = 12;
+// Fixed diagonal pose that shows three faces of the cube simultaneously,
+// mirroring the iconic "isometric" angle of Mario-Kart-style power-up
+// blocks. Same for all gates so they read as a single visual category.
+const GATE_TILT_X = -0.42; // forward tilt (radians) - shows top face
+const GATE_TILT_Y = 0.62; // side turn (radians) - shows right face
+const GATE_BOB_AMPLITUDE = 0.08; // world units of vertical hover travel
+const GATE_BOB_PERIOD_MS = 1400;
+const GATE_SPIN_PERIOD_MS = 9000; // slow constant Y-spin for "alive" feel
+const GATE_TWINKLE_PERIOD_MS = 1200; // emissive pulse cycle
 
 const OBSTACLE_POOL_SIZE = 12;
 const OBSTACLE_HEIGHTS: Readonly<Record<ObstacleVariantId, number>> = {
@@ -507,66 +516,54 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   // ---- Problem-gate mesh pool ------------------------------------------
 
   // Each gate is a THREE.Group of:
-  //   - body: muted-coloured BoxGeometry mesh, slightly emissive
-  //   - edges: LineSegments2 overlay showing the 12 outer edges PLUS the
-  //            24 interior 3x3-grid lines that give the Rubik's-cube look
-  // The grid lines are the secondary visual distinguisher from obstacles
-  // (the primary one is the muted-vs-saturated palette).
+  //   - body: muted-coloured BoxGeometry mesh, slightly translucent
+  //   - edges: LineSegments2 overlay showing the 12 outer edges only
+  //            (no internal grid - the Mario-Kart-style "?" sprite is the
+  //            distinguishing detail rather than a Rubik's face grid)
+  //   - sprite: a camera-facing THREE.Sprite with a programmatic "?"
+  //            texture so the question-block identity is visible from any
+  //            viewing angle
+  // The gate group is rendered at a fixed iso/diagonal pose
+  // (GATE_TILT_X / GATE_TILT_Y) plus a slow per-gate Y-spin so the
+  // edges catch the light. Body emissive intensity pulses for a
+  // power-up sparkle.
 
-  function buildRubiksGridGeometry(size: number): LineSegmentsGeometry {
-    const half = size / 2;
-    const third = size / 3;
-    const inner = [-half + third, half - third];
-    const positions: number[] = [];
-    function seg(
-      x1: number, y1: number, z1: number,
-      x2: number, y2: number, z2: number,
-    ): void {
-      positions.push(x1, y1, z1, x2, y2, z2);
+  // Procedural "?" canvas texture. Drawn once at boot, shared across all
+  // gates. White glyph on transparent background; the gate's body shows
+  // through everywhere except the glyph itself.
+  function makeQuestionMarkTexture(): THREE.CanvasTexture {
+    const size = 128;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(20, 28, 48, 0.7)';
+      ctx.lineWidth = 6;
+      ctx.font =
+        'bold 96px ui-monospace, SFMono-Regular, "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Strokes first so the white glyph sits on top of a dark outline -
+      // keeps the "?" readable against the brighter cube faces.
+      ctx.strokeText('?', size / 2, size / 2 + 4);
+      ctx.fillText('?', size / 2, size / 2 + 4);
     }
-    // Interior grid on each face (2 horizontal + 2 vertical lines per face).
-    // Front (z=+half), Back (z=-half): grid in X,Y.
-    for (const z of [-half, half]) {
-      for (const x of inner) seg(x, -half, z, x, half, z);
-      for (const y of inner) seg(-half, y, z, half, y, z);
-    }
-    // Left (x=-half), Right (x=+half): grid in Y,Z.
-    for (const x of [-half, half]) {
-      for (const y of inner) seg(x, y, -half, x, y, half);
-      for (const z of inner) seg(x, -half, z, x, half, z);
-    }
-    // Top (y=+half), Bottom (y=-half): grid in X,Z.
-    for (const y of [-half, half]) {
-      for (const x of inner) seg(x, y, -half, x, y, half);
-      for (const z of inner) seg(-half, y, z, half, y, z);
-    }
-    // 12 outer edges of the cube.
-    const corners: ReadonlyArray<readonly [number, number, number]> = [
-      [-half, -half, -half], [-half, -half, half],
-      [-half, half, -half], [-half, half, half],
-      [half, -half, -half], [half, -half, half],
-      [half, half, -half], [half, half, half],
-    ];
-    for (let i = 0; i < corners.length; i++) {
-      for (let j = i + 1; j < corners.length; j++) {
-        const a = corners[i]!;
-        const b = corners[j]!;
-        const diff =
-          (a[0] !== b[0] ? 1 : 0) +
-          (a[1] !== b[1] ? 1 : 0) +
-          (a[2] !== b[2] ? 1 : 0);
-        if (diff === 1) {
-          seg(a[0], a[1], a[2], b[0], b[1], b[2]);
-        }
-      }
-    }
-    const lsg = new LineSegmentsGeometry();
-    lsg.setPositions(new Float32Array(positions));
-    return lsg;
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = 4;
+    return tex;
   }
+  const questionMarkTexture = makeQuestionMarkTexture();
 
   const gateGeometry = new THREE.BoxGeometry(GATE_SIZE, GATE_SIZE, GATE_SIZE);
-  const gateEdgeGeometry = buildRubiksGridGeometry(GATE_SIZE);
+  // Simple 12-edge outline (no internal grid) using EdgesGeometry.
+  const gateEdgeGeometry = new LineSegmentsGeometry();
+  gateEdgeGeometry.fromEdgesGeometry(new THREE.EdgesGeometry(gateGeometry, 1));
 
   function gateColorHexToNumber(hex: string): number {
     return parseInt(hex.slice(1), 16);
@@ -578,10 +575,10 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
       color,
       emissive: color,
       emissiveIntensity: 0.55,
-      roughness: 0.45,
-      metalness: 0.35,
+      roughness: 0.4,
+      metalness: 0.55,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.72,
       flatShading: true,
       toneMapped: true,
     });
@@ -591,7 +588,7 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     const color = gateColorHexToNumber(GATE_CATALOGUE[d].colorHex);
     const mat = new LineMaterial({
       color,
-      linewidth: 1.6,
+      linewidth: 2,
       worldUnits: false,
       transparent: false,
       depthWrite: true,
@@ -612,10 +609,22 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     A: makeGateEdgeMaterial('A'),
   };
 
+  // Shared sprite material for the camera-facing "?" decal. Same across all
+  // gates and difficulties - the glyph identity is universal; the cube
+  // colour conveys difficulty.
+  const gateSpriteMaterial = new THREE.SpriteMaterial({
+    map: questionMarkTexture,
+    transparent: true,
+    toneMapped: false,
+    color: 0xffffff,
+    depthWrite: false,
+  });
+
   interface GateSlot {
     readonly group: THREE.Group;
     readonly body: THREE.Mesh;
     readonly edges: LineSegments2;
+    readonly sprite: THREE.Sprite;
   }
 
   const gatePool: GateSlot[] = [];
@@ -623,21 +632,58 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     const grp = new THREE.Group();
     const body = new THREE.Mesh(gateGeometry, gateBodyMaterials.B);
     const edges = new LineSegments2(gateEdgeGeometry, gateEdgeMaterials.B);
+    const sprite = new THREE.Sprite(gateSpriteMaterial);
+    sprite.scale.set(GATE_SIZE * 0.85, GATE_SIZE * 0.85, 1);
     grp.add(body);
     grp.add(edges);
+    grp.add(sprite);
     grp.visible = false;
     scene.add(grp);
-    gatePool.push({ group: grp, body, edges });
+    gatePool.push({ group: grp, body, edges, sprite });
   }
 
-  function updateGates(gates: readonly ProblemGate[]): void {
+  function updateGates(gates: readonly ProblemGate[], tickMs = 0): void {
+    // Sparkle: synchronously pulse all three gate-body materials' emissive
+    // intensity. Time-base is world.tickMs so the pulse freezes during a
+    // modal-open ('answering') frame - the world is paused, the gate
+    // should look paused too.
+    const twinklePhase = (tickMs % GATE_TWINKLE_PERIOD_MS) / GATE_TWINKLE_PERIOD_MS;
+    const twinkle = 0.55 + 0.35 * Math.sin(twinklePhase * Math.PI * 2);
+    gateBodyMaterials.B.emissiveIntensity = twinkle;
+    gateBodyMaterials.M.emissiveIntensity = twinkle;
+    gateBodyMaterials.A.emissiveIntensity = twinkle;
+
     let used = 0;
     for (const g of gates) {
       if (used >= gatePool.length) break;
       const slot = gatePool[used]!;
-      slot.group.position.set(LANE_X[g.lane], GATE_FLOAT_Y, g.worldZ);
-      // Subtle slow rotation around Y so the grid faces catch the light.
-      slot.group.rotation.y = (g.worldZ * 0.05 + g.id * 0.7) % (Math.PI * 2);
+
+      // Vertical hover: each gate bobs with a per-gate phase offset so they
+      // don't all dip in unison. Phase is derived from the gate id (stable
+      // across frames).
+      const bobPhase =
+        (((tickMs + g.id * 137) % GATE_BOB_PERIOD_MS) / GATE_BOB_PERIOD_MS) *
+        Math.PI * 2;
+      const bobY = GATE_FLOAT_Y + Math.sin(bobPhase) * GATE_BOB_AMPLITUDE;
+      slot.group.position.set(LANE_X[g.lane], bobY, g.worldZ);
+
+      // Fixed iso/diagonal pose + a slow continuous Y-spin that drifts
+      // by a per-gate offset so they don't all face the same direction at
+      // exactly the same moment. The base tilt stays constant: viewer
+      // sees the front-left, right-side, and top faces.
+      const spinPhase =
+        ((tickMs + g.id * 311) % GATE_SPIN_PERIOD_MS) / GATE_SPIN_PERIOD_MS;
+      slot.group.rotation.set(
+        GATE_TILT_X,
+        GATE_TILT_Y + spinPhase * Math.PI * 2,
+        0,
+      );
+
+      // The sprite is camera-facing, so it inherits its world rotation
+      // from the camera, not the group - reset its local position to the
+      // group's centre.
+      slot.sprite.position.set(0, 0, 0);
+
       slot.body.material = gateBodyMaterials[g.difficulty];
       slot.edges.material = gateEdgeMaterials[g.difficulty];
       slot.group.visible = true;
