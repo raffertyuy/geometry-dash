@@ -77,6 +77,30 @@ export interface GameLoopHostElements {
 }
 
 /**
+ * Resolve a gate answer + apply the score-below-zero game-over rule with
+ * a single-penalty guarantee: a wrong answer that drops the running score
+ * below zero ends the run, but the life that `resolveAnswer` would have
+ * consumed is refunded so the player isn't penalised twice for the same
+ * mistake. Pure function — extracted from `showProblemModal`'s callback
+ * so the rule is unit-testable.
+ */
+export function applyAnswerToWorld(
+  world: WorldState,
+  isCorrect: boolean,
+  points: number,
+): WorldState {
+  const livesBefore = world.lives;
+  let next = resolveAnswer(world, isCorrect, points);
+  if (next.runState === 'game-over') return next;
+  const total = computeScore(next.tickMs, next.scoreDelta);
+  if (total >= 0) return next;
+  if (!isCorrect && next.lives === livesBefore - 1) {
+    next = { ...next, lives: livesBefore };
+  }
+  return { ...next, runState: 'game-over' };
+}
+
+/**
  * Pure derivation of the Pause button's display state from the world state
  * + modal visibility. Exposed for testing per spec SC-005 / data-model §2.
  */
@@ -261,29 +285,30 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     problemModal.show(gate.problem, (result) => {
       const isCorrect =
         result.kind === 'pick' && result.choiceIndex === gate.problem.correctIndex;
-      world = resolveAnswer(world, isCorrect, points);
+      const livesBefore = world.lives;
+      world = applyAnswerToWorld(world, isCorrect, points);
       floatingScore.pop(
         isCorrect ? `+${points}` : `-${points}`,
         isCorrect ? 'green' : 'red',
       );
-      // Score-below-zero game-over check. Only relevant when resolveAnswer
-      // didn't already transition to game-over via the lives-zero path.
-      if (world.runState !== 'game-over') {
-        const total = computeScore(world.tickMs, world.scoreDelta);
-        if (total < 0) {
-          console.debug({
-            event: 'score_went_negative',
-            tickMs: world.tickMs,
-            scoreDelta: world.scoreDelta,
-            totalScore: total,
-          });
-          console.debug({
-            event: 'run_ended',
-            cause: 'wrong-answer',
-            tickMs: world.tickMs,
-          });
-          world = { ...world, runState: 'game-over' };
-        }
+      if (
+        world.runState === 'game-over' &&
+        !isCorrect &&
+        world.lives === livesBefore
+      ) {
+        // Life-refund path: log so the behaviour is visible in ?debug=1.
+        console.debug({
+          event: 'life_refunded',
+          reason: 'wrong-answer-ended-run-via-score',
+          livesAfter: world.lives,
+        });
+      }
+      if (world.runState === 'game-over' && !isCorrect) {
+        console.debug({
+          event: 'run_ended',
+          cause: 'wrong-answer',
+          tickMs: world.tickMs,
+        });
       }
       problemModal.hide();
       if (world.runState === 'game-over') {
