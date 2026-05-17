@@ -15,6 +15,19 @@ This project uses **GitHub Spec Kit** for spec-driven development. Before writin
 
 Auxiliary skills: `/speckit-checklist`, `/speckit-constitution`, `/speckit-taskstoissues`.
 
+## Autonomous workflow
+
+Drive the full Spec Kit chain end-to-end without per-step confirmation: `/speckit-specify` → `/speckit-clarify` (only if there are genuinely open spec questions) → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement`. Commit at every natural artifact boundary using the project's conventional message style (`feat(spec):`, `plan(NNN):`, `tasks(NNN):`, `impl(NNN):`, etc.). Fix every issue surfaced by `/speckit-analyze` and during implementation without asking — the spec, the constitution-check gate in `plan.md`, and `/speckit-analyze` itself are the safety net.
+
+Pause to ask only when:
+
+- A spec ambiguity materially affects user experience and has no clear default.
+- A constitution violation needs justification in `plan.md` (Complexity Tracking).
+- A destructive / hard-to-reverse action would help (force push, branch delete, dependency removal).
+- An external-visible action would help (PR creation, deploy, posting to a chat).
+
+Narrate concisely as you go so the user can interrupt if something looks off.
+
 ## Tooling latitude
 
 You have standing permission to evolve the dev environment when it helps the work — no need to ask first:
