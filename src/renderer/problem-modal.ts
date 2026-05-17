@@ -1,5 +1,6 @@
 import { GATE_CATALOGUE } from '../problem-gates';
 import type { Problem } from '../shared/types';
+import { mathText } from './math-text';
 
 export interface ProblemModal {
   show(problem: Problem, onResolve: (choiceIndex: 0 | 1 | 2) => void): void;
@@ -81,7 +82,10 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
 
     const prompt = doc.createElement('div');
     prompt.className = 'problem-text';
-    prompt.textContent = problem.prompt;
+    // mathText escapes HTML first, then expands ^{N} / _{N} into <sup> /
+    // <sub>; current prompts use Unicode-only glyphs so the result is
+    // identical to textContent assignment for them.
+    prompt.innerHTML = mathText(problem.prompt);
     host.appendChild(prompt);
 
     // Figure slot. Empty when problem has no figure; CSS `:empty` hides it.
