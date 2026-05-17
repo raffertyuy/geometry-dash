@@ -33,6 +33,7 @@ import {
   createFloatingScore,
   createHowToPlayModal,
   createLivesHud,
+  createMuteButton,
   createPauseButton,
   createProblemModal,
   createThreeRenderer,
@@ -40,10 +41,12 @@ import {
   type FloatingScore,
   type HowToPlayModal,
   type LivesHud,
+  type MuteButton,
   type PauseButton,
   type ProblemModal,
   type ThreeRenderer,
 } from '../renderer';
+import { createAudioEngine, type AudioEngine } from '../audio';
 import { computeScore, formatScore, formatTimer } from '../score';
 import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type {
@@ -74,6 +77,7 @@ export interface GameLoopHostElements {
   readonly howToPlayLinkStart: HTMLElement;
   readonly howToPlayLinkGameOver: HTMLElement;
   readonly pauseButton: HTMLButtonElement;
+  readonly muteButton: HTMLButtonElement;
 }
 
 /**
@@ -144,23 +148,29 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   let gateSpawnState: GateSpawnState = createGateSpawnState(freshSeed());
   let lastObservedTier = 0;
 
+  const audioEngine: AudioEngine = createAudioEngine();
+
   const adapter: InputAdapter = createInputAdapter({
     now: () => performance.now(),
     emit: (e) => {
       lastInput = e;
       player = applyInput(player, e);
     },
+    onLaneChangeAttempt: () => audioEngine.play('lane-change'),
   });
 
   const renderer: ThreeRenderer = createThreeRenderer(host.canvas);
   const debugOverlay: DebugOverlay = createDebugOverlay(host.debugOverlay);
   const livesHud: LivesHud = createLivesHud(host.livesHud);
-  const problemModal: ProblemModal = createProblemModal(host.problemModal);
+  const problemModal: ProblemModal = createProblemModal(host.problemModal, {
+    onCountdownTick: () => audioEngine.play('countdown-tick'),
+  });
   const floatingScore: FloatingScore = createFloatingScore(host.floatingScores);
   function resumeFromPauseButton(): void {
     if (loopState !== 'paused') return;
     world = resumeRun(world);
     loopState = 'running';
+    audioEngine.resumeBgm();
   }
   const howToPlayModal: HowToPlayModal = createHowToPlayModal(
     host.howToPlayOverlay,
@@ -189,6 +199,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     if (howToPlayModal.isVisible()) return;
     world = pauseRun(world);
     loopState = 'paused';
+    audioEngine.pauseBgm();
     howToPlayModal.show('pause');
     console.debug({
       event: 'pause_button_pressed',
@@ -200,6 +211,11 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     host.pauseButton,
     onPauseButtonPressed,
   );
+  const muteButton: MuteButton = createMuteButton(host.muteButton, () => {
+    audioEngine.setMuted(!audioEngine.isMuted());
+    muteButton.setMuted(audioEngine.isMuted());
+  });
+  muteButton.setMuted(audioEngine.isMuted());
   livesHud.set(MAX_LIVES);
 
   function showStartScreen(visible: boolean): void {
@@ -218,6 +234,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     loopState = 'running';
     world = startRun(world);
     showStartScreen(false);
+    audioEngine.startBgm('default');
   }
 
   function triggerGameOver(): void {
@@ -228,6 +245,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     world = endRun(world);
     loopState = 'game-over';
     isAwaitingRestart = true;
+    audioEngine.stopBgm();
+    audioEngine.play('game-over');
     // Display the TOTAL score (tick-derived + scoreDelta). For the score-
     // below-zero game-over path this is negative; per spec FR-015 we show
     // the actual value verbatim with the minus sign, no clamping.
@@ -256,12 +275,14 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     // buffer) so the world doesn't "rewind" hugely on the first frame after
     // restart.
     renderer.reset();
+    audioEngine.startBgm('default');
   }
 
   function pauseFromBlur(): void {
     if (loopState !== 'running') return;
     world = pauseRun(world);
     loopState = 'paused';
+    audioEngine.pauseBgm();
     showPauseOverlay(true);
   }
 
@@ -275,6 +296,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     world = resumeRun(world);
     loopState = 'running';
     isAwaitingResume = false;
+    audioEngine.resumeBgm();
     showPauseOverlay(false);
   }
 
@@ -285,6 +307,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // the game-loop since it needs computeScore from the score module.
   function showProblemModal(gate: ProblemGate): void {
     const points = GATE_CATALOGUE[gate.difficulty].points;
+    audioEngine.play('gate-hit');
+    audioEngine.setBgmTrack('contest');
     problemModal.show(gate.problem, (result) => {
       const isCorrect =
         result.kind === 'pick' && result.choiceIndex === gate.problem.correctIndex;
@@ -293,6 +317,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
         isCorrect ? `+${points}` : `-${points}`,
         isCorrect ? 'green' : 'red',
       );
+      audioEngine.play(isCorrect ? 'correct-answer' : 'life-lost');
       // Push the new lives count to the HUD immediately so the player
       // sees the deduction even when game-over fires on the same tick
       // and short-circuits the per-frame HUD update.
@@ -307,6 +332,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
       problemModal.hide();
       if (world.runState === 'game-over') {
         triggerGameOver();
+      } else {
+        // Run continues — swap back to default BGM.
+        audioEngine.setBgmTrack('default');
       }
     });
   }
@@ -314,6 +342,13 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // ---- DOM event bridging ----
 
   function onKeyDown(event: KeyboardEvent): void {
+    // Mute toggle is global — works in every loop state regardless of any
+    // modal being open.
+    if (event.key === 'm' || event.key === 'M') {
+      audioEngine.setMuted(!audioEngine.isMuted());
+      muteButton.setMuted(audioEngine.isMuted());
+      return;
+    }
     // How-to-Play modal owns the keyboard while visible (its own ESC/SPACE
     // capture listener closes it). Don't let stray keystrokes start or
     // restart the run behind it.
@@ -500,11 +535,13 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
             continue;
           }
           consumedObstacleIds.add(obstacle.id);
+          audioEngine.play('obstacle-hit');
           world = consumeLife(world, 'obstacle');
           if (world.runState === 'game-over') {
             triggerGameOver();
             break;
           }
+          audioEngine.play('life-lost');
           // Respawn in centre lane; obstacle is despawned so the same hit
           // doesn't re-fire next frame.
           player = createPlayerState();
@@ -548,6 +585,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     const pbState = derivePauseButtonState(loopState, world, howToPlayModal.isVisible());
     pauseButton.setVisible(pbState.visible);
     pauseButton.setEnabled(pbState.enabled);
+    muteButton.setMuted(audioEngine.isMuted());
     host.score.textContent = formatScore(
       computeScore(world.tickMs, world.scoreDelta),
     );
@@ -574,6 +612,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     host.howToPlayLinkGameOver.removeEventListener('pointerup', stopHowToPlayLinkPointer);
     howToPlayModal.destroy();
     pauseButton.destroy();
+    muteButton.destroy();
+    audioEngine.destroy();
     problemModal.destroy();
     floatingScore.destroy();
     livesHud.destroy();

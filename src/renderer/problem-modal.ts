@@ -56,7 +56,14 @@ let autoContinuePref = false;
  * paused throughout the review window. This means no runner-engine
  * refactor is needed; the modal absorbs the review delay.
  */
-export function createProblemModal(host: HTMLElement): ProblemModal {
+export interface ProblemModalDeps {
+  readonly onCountdownTick?: () => void;
+}
+
+export function createProblemModal(
+  host: HTMLElement,
+  deps: ProblemModalDeps = {},
+): ProblemModal {
   const doc = host.ownerDocument;
   const win = doc.defaultView ?? window;
 
@@ -107,15 +114,18 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     const remaining = questionTimerRemainingMs();
     const urgent = remaining <= QUESTION_TIMER_URGENCY_MS;
     const totalSecondsLeft = Math.ceil(remaining / 1000);
-    if (
-      totalSecondsLeft !== qTimerLastDisplayedSeconds ||
-      urgent !== qTimerLastDisplayedUrgent
-    ) {
+    const secondsChanged = totalSecondsLeft !== qTimerLastDisplayedSeconds;
+    if (secondsChanged || urgent !== qTimerLastDisplayedUrgent) {
       qTimerLastDisplayedSeconds = totalSecondsLeft;
       qTimerLastDisplayedUrgent = urgent;
       const base = formatMSS(remaining);
       questionCountdownEl.textContent = urgent ? `Hurry! ${base}` : base;
       questionCountdownEl.classList.toggle('countdown-question--urgent', urgent);
+    }
+    // Per-second tick in the urgency band — fires once per second-boundary
+    // transition while remaining is between 0 and the urgency threshold.
+    if (secondsChanged && urgent && remaining > 0) {
+      deps.onCountdownTick?.();
     }
     if (remaining <= 0) {
       handleQuestionTimeout();

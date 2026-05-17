@@ -5,6 +5,13 @@ import { detectSwipe, type SwipePoint } from './swipe-detector';
 export interface InputAdapterDeps {
   readonly now: () => number;
   readonly emit: (e: InputEvent) => void;
+  /**
+   * Optional side-effect callback fired when a lane-change input is accepted
+   * (i.e., the same code path that calls `emit`). Used by the audio engine
+   * to play the lane-change blip. Coalesced inputs do NOT fire this — only
+   * accepted lane-change attempts do.
+   */
+  readonly onLaneChangeAttempt?: (direction: Direction) => void;
 }
 
 export interface InputAdapter {
@@ -24,7 +31,7 @@ function recogniseKey(key: string): Direction | null {
 }
 
 export function createInputAdapter(deps: InputAdapterDeps): InputAdapter {
-  const { now, emit } = deps;
+  const { now, emit, onLaneChangeAttempt } = deps;
   let lastEmitTimeMs: number | null = null;
   let lastEmitDirection: Direction | null = null;
   let pointerStart: SwipePoint | null = null;
@@ -42,6 +49,7 @@ export function createInputAdapter(deps: InputAdapterDeps): InputAdapter {
     lastEmitTimeMs = timestampMs;
     lastEmitDirection = direction;
     emit({ direction, source, timestampMs });
+    onLaneChangeAttempt?.(direction);
   }
 
   return {

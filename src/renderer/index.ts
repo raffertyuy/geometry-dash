@@ -5,4 +5,5 @@ export { createProblemModal, type ProblemModal } from './problem-modal';
 export { createFloatingScore, type FloatingScore } from './floating-score';
 export { createHowToPlayModal, type HowToPlayModal } from './how-to-play-modal';
 export { createPauseButton, type PauseButton } from './pause-button';
+export { createMuteButton, type MuteButton } from './mute-button';
 export { mathText } from './math-text';

@@ -716,6 +716,39 @@
         cursor: not-allowed;
         opacity: 0.35;
       }
+
+      /* Mute button — always visible, always reachable. Positioned at the
+         top-right of the playfield, balancing the centred Pause button. */
+      .mute-button {
+        appearance: none;
+        background: rgba(8, 12, 24, 0.7);
+        border: 1px solid rgba(24, 200, 255, 0.45);
+        border-radius: 6px;
+        color: #18c8ff;
+        cursor: pointer;
+        font-size: clamp(1rem, 2.4vw, 1.25rem);
+        line-height: 1;
+        padding: 0.3em 0.55em;
+        pointer-events: auto;
+        position: fixed;
+        right: clamp(8px, 1.5vw, 16px);
+        top: clamp(8px, 1.5vh, 16px);
+        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
+        z-index: 5;
+      }
+
+      .mute-button:hover,
+      .mute-button:focus-visible {
+        background: rgba(24, 200, 255, 0.16);
+        border-color: rgba(24, 200, 255, 0.8);
+        outline: none;
+      }
+
+      .mute-button.is-muted {
+        color: #9090a0;
+        border-color: rgba(144, 144, 160, 0.45);
+        opacity: 0.7;
+      }
     </style>
   </head>
   <body>
@@ -755,6 +788,8 @@ Swipe left or right on mobile</p>
     <div id="how-to-play-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="How to Play"></div>
 
     <button id="pause-button" class="pause-button hidden" type="button" aria-label="Pause" disabled>⏸</button>
+
+    <button id="mute-button" class="mute-button" type="button" aria-label="Mute audio" aria-pressed="false">🔊</button>
 
     <div id="floating-scores" aria-hidden="true"></div>
 

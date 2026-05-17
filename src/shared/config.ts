@@ -85,6 +85,15 @@ export const QUESTION_TIMER_URGENCY_MS = 10_000;
 // per-frame textContent churn.
 export const QUESTION_TIMER_DISPLAY_INTERVAL_MS = 250;
 
+// Audio (slice 009). Tuned by ear; SFX synths apply their own per-event
+// scaling on top of AUDIO_SFX_BASE_VOLUME to keep the mix balanced.
+export const AUDIO_MASTER_BASE_VOLUME = 0.55;
+export const AUDIO_SFX_BASE_VOLUME = 0.4;
+export const AUDIO_BGM_URLS: Readonly<Record<'default' | 'contest', string>> = {
+  default: '/audio/bgm-default.opus',
+  contest: '/audio/bgm-contest.opus',
+};
+
 // Per-lane gate distribution. For every non-obstacle lane in a spawned
 // obstacle row, the spawner independently samples a uniform value from
 // {empty, B, M, A} weighted by these constants. The four values MUST sum
