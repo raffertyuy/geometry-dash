@@ -138,6 +138,11 @@ This slice inherits all setup from 001–005. No project-level setup work requir
 - [ ] T043 320 px viewport validation: open Chrome DevTools → Device Toolbar → iPhone SE preset. Verify the modal with a diagram + three answer choices fits without horizontal overflow on a 320 × 568 portrait phone. Open the credits panel; verify source entries stack vertically with readable text + tappable links. The diagram does not push the answer rows below the fold.
 - [ ] T044 Mobile-device validation on a real iOS Safari and/or Android Chrome device on the same LAN: open `localhost:5173`; play a run with ≥ 3 gate hits including at least one with a diagram; verify the diagram is sharp at the device's DPI; tap to commit answers; open the credits panel via tap. No `console.error` or unhandled rejections.
 - [ ] T045 Final end-to-end validation per [quickstart.md](./quickstart.md) "Definition of done" checklist — tick every box.
+- [ ] T046 [P] Implement `src/renderer/math-text.ts` + `math-text.test.ts` per spec FR-010 (added during /speckit-analyze remediation). Helper exports `mathText(input: string): string` that walks the input and wraps:
+  - Trailing or embedded `^{N}` patterns (e.g., `x^{11}`) into `<sup>11</sup>`.
+  - `_{N}` patterns into `<sub>N</sub>`.
+  - Returns HTML-safe output (escapes `<`, `>`, `&` in non-tag spans).
+  Update `src/renderer/problem-modal.ts` `buildBody` to apply `mathText()` to `problem.prompt` via `innerHTML` instead of `textContent`. Smoke tests in jsdom: plain text passes through unchanged; `^{11}` becomes `<sup>11</sup>`; `_{n}` becomes `<sub>n</sub>`; mixed cases work; HTML special characters are escaped. Note: the current B / M / A pool + templates use Unicode glyphs only (², ³, ₀..₉) so this helper is forward-looking — no current prompt triggers a wrap.
 
 ---
 
