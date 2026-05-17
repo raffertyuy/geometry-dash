@@ -77,28 +77,8 @@
         line-height: 1.5;
       }
 
-      /* Two-step start-screen entry: first tap primes audio and updates
-         the prompt text via CSS; second tap begins the run. The text swap
-         is driven by replacing the prompt's ::before pseudo-content; the
-         underlying <p> text is hidden when the class is active to avoid
-         the original "Press any key or tap to start" remaining visible. */
       #start-screen .start-prompt {
         font-size: clamp(1.0rem, 2.4vw, 1.2rem);
-      }
-
-      #start-screen.is-audio-primed .start-prompt {
-        visibility: hidden;
-        position: relative;
-      }
-
-      #start-screen.is-audio-primed .start-prompt::before {
-        content: '🎵 Press again to begin';
-        visibility: visible;
-        position: absolute;
-        left: 0;
-        right: 0;
-        text-align: center;
-        animation: start-prompt-pulse 1.4s ease-in-out infinite;
       }
 
       @keyframes start-prompt-pulse {
