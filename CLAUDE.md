@@ -15,6 +15,16 @@ This project uses **GitHub Spec Kit** for spec-driven development. Before writin
 
 Auxiliary skills: `/speckit-checklist`, `/speckit-constitution`, `/speckit-taskstoissues`.
 
+## Tooling latitude
+
+You have standing permission to evolve the dev environment when it helps the work — no need to ask first:
+
+- Edit `CLAUDE.md` to keep instructions accurate as the project changes.
+- Author new Claude Code skills (under `.claude/skills/` or `~/.claude/skills/`) when a repeated workflow would benefit.
+- Configure new MCP servers when they unlock useful capabilities (e.g. docs, design refs, deployment).
+
+Still narrate what you're changing and why, and roll changes back if they don't earn their keep.
+
 ## Project rules
 
 The project **constitution** lives at `.specify/memory/constitution.md` and is binding. Summary of v1.0.0:
