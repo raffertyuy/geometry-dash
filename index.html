@@ -449,7 +449,7 @@
          and game-over overlays beneath the existing instructions. The
          parent .overlay has pointer-events: none for its children so the
          underlying canvas can still receive input; we re-enable it here. */
-      .credits-link {
+      .how-to-play-link {
         appearance: none;
         background: transparent;
         border: 1px solid rgba(24, 200, 255, 0.35);
@@ -465,31 +465,31 @@
         transition: background 120ms ease-out, border-color 120ms ease-out;
       }
 
-      .credits-link:hover,
-      .credits-link:focus-visible {
+      .how-to-play-link:hover,
+      .how-to-play-link:focus-visible {
         background: rgba(24, 200, 255, 0.12);
         border-color: rgba(24, 200, 255, 0.7);
         outline: none;
       }
 
-      /* Credits overlay. Reuses .overlay backdrop but is a stand-alone
-         layer (not the start or game-over overlay). The .credits-body
-         is a centred scrollable panel. */
-      #credits-overlay {
+      /* How-to-Play overlay. Reuses .overlay backdrop. The .how-to-play-body
+         is a centred scrollable panel containing three sections:
+         General Rules / Problem Cubes / Credits. */
+      #how-to-play-overlay {
         align-items: center;
         justify-content: center;
         padding: 1rem;
-        pointer-events: auto; /* enable backdrop click-to-close */
+        pointer-events: auto;
       }
 
-      #credits-overlay .credits-body {
+      #how-to-play-overlay .how-to-play-body {
         background: rgba(8, 12, 24, 0.95);
         border: 1px solid rgba(24, 200, 255, 0.35);
         border-radius: 8px;
         box-shadow: 0 0 24px rgba(24, 200, 255, 0.2);
         color: #e8e8ef;
         max-height: 80vh;
-        max-width: min(92vw, 640px);
+        max-width: min(92vw, 680px);
         overflow-y: auto;
         padding: 1.4rem 1.6rem 1.2rem;
         pointer-events: auto;
@@ -498,20 +498,114 @@
         width: 100%;
       }
 
-      #credits-overlay h2 {
+      #how-to-play-overlay h2 {
         color: #18c8ff;
         font-size: clamp(1.2rem, 3.4vw, 1.6rem);
         margin: 0 0 0.6em 0;
         text-shadow: 0 0 8px rgba(24, 200, 255, 0.4);
       }
 
-      #credits-overlay .credits-intro {
+      #how-to-play-overlay .htp-section {
+        margin: 0 0 1.4em 0;
+      }
+
+      #how-to-play-overlay .htp-section h3 {
+        color: #18c8ff;
+        font-size: clamp(1rem, 2.6vw, 1.2rem);
+        letter-spacing: 0.04em;
+        margin: 0 0 0.5em 0;
+        text-transform: uppercase;
+        text-shadow: 0 0 6px rgba(24, 200, 255, 0.3);
+      }
+
+      #how-to-play-overlay .htp-general-rules ul {
+        color: #c8c8d8;
+        display: flex;
+        flex-direction: column;
+        font-size: clamp(0.88rem, 2vw, 1rem);
+        gap: 0.5em;
+        line-height: 1.4;
+        list-style: disc;
+        margin: 0;
+        padding-left: 1.4em;
+      }
+
+      #how-to-play-overlay .htp-cubes-intro {
+        color: #c0c0d0;
+        font-size: clamp(0.85rem, 1.9vw, 0.95rem);
+        margin: 0 0 0.8em 0;
+      }
+
+      #how-to-play-overlay .htp-cube-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9em;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      #how-to-play-overlay .htp-cube-row {
+        align-items: flex-start;
+        display: grid;
+        gap: 0.9em;
+        grid-template-columns: 44px 1fr;
+      }
+
+      #how-to-play-overlay .cube-swatch {
+        background-clip: padding-box;
+        border: 2px solid rgba(255, 255, 255, 0.55);
+        border-radius: 4px;
+        box-shadow: 0 0 10px currentColor;
+        display: block;
+        height: 36px;
+        margin-top: 0.15em;
+        width: 36px;
+      }
+
+      #how-to-play-overlay .htp-cube-text {
+        color: #e8e8ef;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2em;
+        font-size: clamp(0.85rem, 1.9vw, 0.95rem);
+      }
+
+      #how-to-play-overlay .htp-cube-label {
+        color: #e8e8ef;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      #how-to-play-overlay .htp-cube-description {
+        color: #c0c0d0;
+        line-height: 1.35;
+        margin: 0;
+      }
+
+      #how-to-play-overlay .htp-cube-stats {
+        color: #9090a0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(0.8rem, 1.7vw, 0.9rem);
+        letter-spacing: 0.03em;
+      }
+
+      @media (max-width: 360px) {
+        #how-to-play-overlay .htp-cube-row {
+          grid-template-columns: 1fr;
+        }
+        #how-to-play-overlay .cube-swatch {
+          margin-top: 0;
+        }
+      }
+
+      #how-to-play-overlay .credits-intro {
         color: #c0c0d0;
         font-size: clamp(0.9rem, 2vw, 1rem);
         margin: 0 0 1em 0;
       }
 
-      #credits-overlay .credits-list {
+      #how-to-play-overlay .credits-list {
         display: flex;
         flex-direction: column;
         gap: 1em;
@@ -520,7 +614,7 @@
         padding: 0;
       }
 
-      #credits-overlay .source-entry {
+      #how-to-play-overlay .source-entry {
         border-left: 2px solid rgba(24, 200, 255, 0.35);
         display: flex;
         flex-direction: column;
@@ -528,37 +622,37 @@
         padding: 0.2em 0 0.2em 0.8em;
       }
 
-      #credits-overlay .source-name {
+      #how-to-play-overlay .source-name {
         color: #e8e8ef;
         font-size: clamp(0.95rem, 2.2vw, 1.05rem);
         font-weight: 600;
       }
 
-      #credits-overlay .source-url {
+      #how-to-play-overlay .source-url {
         color: #18c8ff;
         font-size: clamp(0.8rem, 1.7vw, 0.9rem);
         text-decoration: underline;
         word-break: break-all;
       }
 
-      #credits-overlay .source-url:hover,
-      #credits-overlay .source-url:focus-visible {
+      #how-to-play-overlay .source-url:hover,
+      #how-to-play-overlay .source-url:focus-visible {
         color: #6be5ff;
         outline: none;
       }
 
-      #credits-overlay .source-license {
+      #how-to-play-overlay .source-license {
         color: #9090a0;
         font-size: clamp(0.8rem, 1.7vw, 0.9rem);
       }
 
-      #credits-overlay .source-attribution {
+      #how-to-play-overlay .source-attribution {
         color: #c0c0d0;
         font-size: clamp(0.8rem, 1.7vw, 0.9rem);
         font-style: italic;
       }
 
-      #credits-overlay .close-button {
+      #how-to-play-overlay .close-button {
         appearance: none;
         background: transparent;
         border: none;
@@ -573,10 +667,45 @@
         transition: color 120ms ease-out;
       }
 
-      #credits-overlay .close-button:hover,
-      #credits-overlay .close-button:focus-visible {
+      #how-to-play-overlay .close-button:hover,
+      #how-to-play-overlay .close-button:focus-visible {
         color: #18c8ff;
         outline: none;
+      }
+
+      /* Pause button — top-centre HUD affordance shown only during an
+         active run. Disabled state applies during gate modals + respawn
+         invincibility, conveyed visually by reduced opacity + no-cursor. */
+      .pause-button {
+        appearance: none;
+        background: rgba(8, 12, 24, 0.7);
+        border: 1px solid rgba(24, 200, 255, 0.45);
+        border-radius: 6px;
+        color: #18c8ff;
+        cursor: pointer;
+        font-size: clamp(1rem, 2.4vw, 1.25rem);
+        left: 50%;
+        line-height: 1;
+        padding: 0.3em 0.7em;
+        pointer-events: auto;
+        position: fixed;
+        top: clamp(8px, 1.5vh, 16px);
+        transform: translateX(-50%);
+        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
+        z-index: 5;
+      }
+
+      .pause-button:hover,
+      .pause-button:focus-visible {
+        background: rgba(24, 200, 255, 0.16);
+        border-color: rgba(24, 200, 255, 0.8);
+        outline: none;
+      }
+
+      .pause-button[disabled],
+      .pause-button.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.35;
       }
     </style>
   </head>
@@ -588,7 +717,7 @@
       <p>Press any key or tap to start</p>
       <p class="hint">Arrow keys / WASD on desktop
 Swipe left or right on mobile</p>
-      <button id="credits-link-start" class="credits-link" type="button">Problem credits</button>
+      <button id="how-to-play-link-start" class="how-to-play-link" type="button">How to Play</button>
     </div>
 
     <div id="pause-overlay" class="overlay hidden">
@@ -609,12 +738,14 @@ Swipe left or right on mobile</p>
       <p class="hud-label">Time</p>
       <p class="game-over-stat" id="game-over-timer">0:00</p>
       <p class="hint">Tap or press any key to play again</p>
-      <button id="credits-link-game-over" class="credits-link" type="button">Problem credits</button>
+      <button id="how-to-play-link-game-over" class="how-to-play-link" type="button">How to Play</button>
     </div>
 
     <div id="problem-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Problem"></div>
 
-    <div id="credits-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Problem credits"></div>
+    <div id="how-to-play-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="How to Play"></div>
+
+    <button id="pause-button" class="pause-button hidden" type="button" aria-label="Pause" disabled>⏸</button>
 
     <div id="floating-scores" aria-hidden="true"></div>
 

@@ -29,16 +29,18 @@ import {
 } from '../runner-engine';
 import { PROBLEM_SOURCES } from '../problems/sources';
 import {
-  createCreditsPanel,
   createDebugOverlay,
   createFloatingScore,
+  createHowToPlayModal,
   createLivesHud,
+  createPauseButton,
   createProblemModal,
   createThreeRenderer,
-  type CreditsPanel,
   type DebugOverlay,
   type FloatingScore,
+  type HowToPlayModal,
   type LivesHud,
+  type PauseButton,
   type ProblemModal,
   type ThreeRenderer,
 } from '../renderer';
@@ -68,9 +70,28 @@ export interface GameLoopHostElements {
   readonly gameOverTimer: HTMLElement;
   readonly problemModal: HTMLElement;
   readonly floatingScores: HTMLElement;
-  readonly creditsOverlay: HTMLElement;
-  readonly creditsLinkStart: HTMLElement;
-  readonly creditsLinkGameOver: HTMLElement;
+  readonly howToPlayOverlay: HTMLElement;
+  readonly howToPlayLinkStart: HTMLElement;
+  readonly howToPlayLinkGameOver: HTMLElement;
+  readonly pauseButton: HTMLButtonElement;
+}
+
+/**
+ * Pure derivation of the Pause button's display state from the world state
+ * + modal visibility. Exposed for testing per spec SC-005 / data-model §2.
+ */
+export function derivePauseButtonState(
+  loopState: LoopState,
+  world: WorldState,
+  howToPlayModalVisible: boolean,
+): { readonly visible: boolean; readonly enabled: boolean } {
+  const visible = loopState === 'running';
+  const enabled =
+    visible &&
+    world.runState === 'running' &&
+    world.invincibilityRemainingMs === 0 &&
+    !howToPlayModalVisible;
+  return { visible, enabled };
 }
 
 export interface GameLoopHandles {
@@ -109,27 +130,49 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   const livesHud: LivesHud = createLivesHud(host.livesHud);
   const problemModal: ProblemModal = createProblemModal(host.problemModal);
   const floatingScore: FloatingScore = createFloatingScore(host.floatingScores);
-  const creditsPanel: CreditsPanel = createCreditsPanel(
-    host.creditsOverlay,
-    PROBLEM_SOURCES,
-  );
-  function openCredits(event: Event): void {
-    event.stopPropagation();
-    creditsPanel.show();
+  function resumeFromPauseButton(): void {
+    if (loopState !== 'paused') return;
+    world = resumeRun(world);
+    loopState = 'running';
   }
-  function stopCreditsLinkPointer(event: Event): void {
+  const howToPlayModal: HowToPlayModal = createHowToPlayModal(
+    host.howToPlayOverlay,
+    PROBLEM_SOURCES,
+    resumeFromPauseButton,
+  );
+  function openHowToPlayEntry(event: Event): void {
+    event.stopPropagation();
+    howToPlayModal.show('entry');
+  }
+  function stopHowToPlayLinkPointer(event: Event): void {
     // The window-level onPointerDown handler would otherwise read this
     // bubble and call beginRun() / restartFromInput() before our click
-    // listener fires. Swallow it at the link so the credits-link tap is
-    // only a credits-link tap.
+    // listener fires. Swallow it so the link tap is only a link tap.
     event.stopPropagation();
   }
-  host.creditsLinkStart.addEventListener('click', openCredits);
-  host.creditsLinkGameOver.addEventListener('click', openCredits);
-  host.creditsLinkStart.addEventListener('pointerdown', stopCreditsLinkPointer);
-  host.creditsLinkGameOver.addEventListener('pointerdown', stopCreditsLinkPointer);
-  host.creditsLinkStart.addEventListener('pointerup', stopCreditsLinkPointer);
-  host.creditsLinkGameOver.addEventListener('pointerup', stopCreditsLinkPointer);
+  host.howToPlayLinkStart.addEventListener('click', openHowToPlayEntry);
+  host.howToPlayLinkGameOver.addEventListener('click', openHowToPlayEntry);
+  host.howToPlayLinkStart.addEventListener('pointerdown', stopHowToPlayLinkPointer);
+  host.howToPlayLinkGameOver.addEventListener('pointerdown', stopHowToPlayLinkPointer);
+  host.howToPlayLinkStart.addEventListener('pointerup', stopHowToPlayLinkPointer);
+  host.howToPlayLinkGameOver.addEventListener('pointerup', stopHowToPlayLinkPointer);
+
+  function onPauseButtonPressed(): void {
+    if (loopState !== 'running') return;
+    if (howToPlayModal.isVisible()) return;
+    world = pauseRun(world);
+    loopState = 'paused';
+    howToPlayModal.show('pause');
+    console.debug({
+      event: 'pause_button_pressed',
+      source: 'click',
+      tickMs: world.tickMs,
+    });
+  }
+  const pauseButton: PauseButton = createPauseButton(
+    host.pauseButton,
+    onPauseButtonPressed,
+  );
   livesHud.set(MAX_LIVES);
 
   function showStartScreen(visible: boolean): void {
@@ -252,9 +295,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // ---- DOM event bridging ----
 
   function onKeyDown(event: KeyboardEvent): void {
-    // Credits panel owns the keyboard while visible (Escape closes it).
-    // Don't let stray keystrokes start or restart the run behind it.
-    if (creditsPanel.isVisible()) return;
+    // How-to-Play modal owns the keyboard while visible (its own ESC/SPACE
+    // capture listener closes it). Don't let stray keystrokes start or
+    // restart the run behind it.
+    if (howToPlayModal.isVisible()) return;
     if (loopState === 'start-screen') {
       beginRun();
       return; // do not also drive lane-state with the press that started the run
@@ -267,6 +311,15 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
       resumeFromInput();
       return;
     }
+    // ESC / SPACE during an actively running run → open pause-mode How-to-Play.
+    if (
+      loopState === 'running' &&
+      pauseButton.isEnabled() &&
+      (event.key === 'Escape' || event.key === ' ')
+    ) {
+      onPauseButtonPressed();
+      return;
+    }
     // Modal owns its own keyboard listeners (window-level) while open; the
     // game-loop ignores lane-change keys during 'answering' so a stray
     // arrow-key doesn't steer the runner into a wall on resume.
@@ -275,10 +328,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   }
 
   function onPointerDown(event: PointerEvent): void {
-    // While the credits panel is up, taps either land inside its body or
-    // hit the backdrop. The panel's own click handler closes on backdrop
+    // While the How-to-Play modal is up, taps either land inside its body
+    // or hit the backdrop. The modal's own click handler closes on backdrop
     // hits; the game-loop should not also start or restart the run.
-    if (creditsPanel.isVisible()) return;
+    if (howToPlayModal.isVisible()) return;
     if (loopState === 'start-screen') {
       beginRun();
       return;
@@ -473,6 +526,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     renderer.draw(player, world);
     debugOverlay.update(player, world, lastInput, problemModal.getDebugSnapshot());
     livesHud.set(world.lives);
+    const pbState = derivePauseButtonState(loopState, world, howToPlayModal.isVisible());
+    pauseButton.setVisible(pbState.visible);
+    pauseButton.setEnabled(pbState.enabled);
     host.score.textContent = formatScore(
       computeScore(world.tickMs, world.scoreDelta),
     );
@@ -491,13 +547,14 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     window.removeEventListener('focus', onFocus);
     window.removeEventListener('resize', onResize);
     document.removeEventListener('visibilitychange', onVisibilityChange);
-    host.creditsLinkStart.removeEventListener('click', openCredits);
-    host.creditsLinkGameOver.removeEventListener('click', openCredits);
-    host.creditsLinkStart.removeEventListener('pointerdown', stopCreditsLinkPointer);
-    host.creditsLinkGameOver.removeEventListener('pointerdown', stopCreditsLinkPointer);
-    host.creditsLinkStart.removeEventListener('pointerup', stopCreditsLinkPointer);
-    host.creditsLinkGameOver.removeEventListener('pointerup', stopCreditsLinkPointer);
-    creditsPanel.destroy();
+    host.howToPlayLinkStart.removeEventListener('click', openHowToPlayEntry);
+    host.howToPlayLinkGameOver.removeEventListener('click', openHowToPlayEntry);
+    host.howToPlayLinkStart.removeEventListener('pointerdown', stopHowToPlayLinkPointer);
+    host.howToPlayLinkGameOver.removeEventListener('pointerdown', stopHowToPlayLinkPointer);
+    host.howToPlayLinkStart.removeEventListener('pointerup', stopHowToPlayLinkPointer);
+    host.howToPlayLinkGameOver.removeEventListener('pointerup', stopHowToPlayLinkPointer);
+    howToPlayModal.destroy();
+    pauseButton.destroy();
     problemModal.destroy();
     floatingScore.destroy();
     livesHud.destroy();
