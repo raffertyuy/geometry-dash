@@ -188,13 +188,14 @@ if (world.runState !== 'running') return world;
 #### `consumeLife(world, cause) → WorldState`
 
 - **Input**: `world: WorldState`, `cause: 'obstacle' | 'wrong-answer'`.
-- **Output**: a new `WorldState` with `lives` decremented by 1 and (if `lives` was > 1) `invincibilityRemainingMs = INVINCIBILITY_DURATION_MS`. If the new `lives === 0`, transitions `runState` to `'game-over'` (and does NOT set invincibility — the run is over).
+- **Output**: a new `WorldState` with `lives` decremented by 1. **Invincibility is granted ONLY when `cause === 'obstacle'`** (per spec FR-010/FR-011 — the 3-second window is the post-obstacle-collision recovery grace; wrong-answer life loss is instantaneous with no respawn or invincibility). If the new `lives === 0`, transitions `runState` to `'game-over'` (and does NOT set invincibility — the run is over regardless of cause).
 - **Behaviour**:
-  - When `lives > 1`: returns `{ ...world, lives: lives - 1, invincibilityRemainingMs: 3000 }`.
-  - When `lives === 1`: returns `{ ...world, lives: 0, runState: 'game-over' }`. Emits `console.debug({ event: 'run_ended', cause, tickMs })`.
+  - When `lives > 1` AND `cause === 'obstacle'`: returns `{ ...world, lives: lives - 1, invincibilityRemainingMs: INVINCIBILITY_DURATION_MS }`.
+  - When `lives > 1` AND `cause === 'wrong-answer'`: returns `{ ...world, lives: lives - 1 }` (no invincibility change — typically already 0 because a gate modal only opens outside the invincibility window).
+  - When `lives === 1`: returns `{ ...world, lives: 0, runState: 'game-over' }`. Emits `console.debug({ event: 'run_ended', cause, tickMs })` (the `cause` field extends the existing `run_ended` payload starting in this slice).
   - Emits `console.debug({ event: 'life_consumed', cause, livesAfter })`.
-  - Emits `console.debug({ event: 'invincibility_started', durationMs })` when invincibility is set.
-- **Total function**: callers should not invoke when `runState !== 'running'` and not while `invincibilityRemainingMs > 0`; the function asserts these in debug builds but returns the world unchanged in production.
+  - Emits `console.debug({ event: 'invincibility_started', durationMs })` only when invincibility is set (i.e., `cause === 'obstacle'` AND lives stayed > 0).
+- **Total function**: callers should not invoke when `runState !== 'running'`; for `cause === 'obstacle'`, callers should additionally check `invincibilityRemainingMs === 0` first (the function does not re-guard).
 
 #### `enterAnswering(world, gate) → WorldState`
 
@@ -231,8 +232,10 @@ if (world.runState !== 'running') return world;
 - `restartRun(world)`: returns the four new fields at their initial values regardless of input's values.
 - `tickWorld(...)`:
   - With `runState: 'answering'`, returns `world` unchanged (existing 14+ tests pass).
-- `consumeLife({ lives: 3, ... }, 'obstacle')` → `{ lives: 2, invincibilityRemainingMs: 3000, ... }`.
+- `consumeLife({ lives: 3, invincibilityRemainingMs: 0, ... }, 'obstacle')` → `{ lives: 2, invincibilityRemainingMs: 3000, ... }`.
+- `consumeLife({ lives: 3, invincibilityRemainingMs: 0, ... }, 'wrong-answer')` → `{ lives: 2, invincibilityRemainingMs: 0, ... }` (no invincibility on wrong-answer life loss).
 - `consumeLife({ lives: 1, ... }, 'wrong-answer')` → `{ lives: 0, runState: 'game-over', invincibilityRemainingMs: 0, ... }`.
+- `consumeLife({ lives: 1, ... }, 'obstacle')` → `{ lives: 0, runState: 'game-over', invincibilityRemainingMs: 0, ... }` (last-life cause is `'obstacle'` but the run is over so no invincibility is granted).
 - `enterAnswering({ runState: 'running', ... }, gate)` → `{ runState: 'answering', activeGate: { ... }, ... }`.
 - `enterAnswering({ runState: 'paused', ... }, gate)` → unchanged (paused world doesn't enter answering).
 - `resolveAnswer(... , true,  1000)` from `runState: 'answering'`, `lives: 3`, `scoreDelta: 0`, `tickMs: 10_000`: returns `runState: 'running', scoreDelta: 1000`, `lives: 3`.

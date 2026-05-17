@@ -281,6 +281,6 @@ New `console.debug` events (payloads):
 - `invincibility_ended`  `{ tickMs }`
 - `score_went_negative`  `{ tickMs, scoreDelta, totalScore }`
 
-Existing events unchanged: `run_started`, `run_paused`, `run_resumed`, `run_ended`, `run_restarted`, `obstacle_spawned`, `collision_detected`, `tier_advanced`.
+Existing events mostly unchanged: `run_started`, `run_paused`, `run_resumed`, `run_restarted`, `obstacle_spawned`, `collision_detected`, `tier_advanced` are emitted with the same payloads as in prior slices. **`run_ended` is extended** with an optional `cause: 'obstacle' | 'wrong-answer'` field starting this slice (emitted by `consumeLife` when it ends the run; the existing direct `endRun` call site can omit `cause` and consumers should treat its absence as "legacy collision path").
 
 The `?debug=1` overlay gains four rows: `lives`, `invinc`, `gate`, `delta`. Each is a single line; layout is unchanged.
