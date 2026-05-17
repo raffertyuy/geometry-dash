@@ -77,27 +77,24 @@ export interface GameLoopHostElements {
 }
 
 /**
- * Resolve a gate answer + apply the score-below-zero game-over rule with
- * a single-penalty guarantee: a wrong answer that drops the running score
- * below zero ends the run, but the life that `resolveAnswer` would have
- * consumed is refunded so the player isn't penalised twice for the same
- * mistake. Pure function — extracted from `showProblemModal`'s callback
- * so the rule is unit-testable.
+ * Resolve a gate answer + apply the score-below-zero game-over rule.
+ * A wrong answer always costs exactly one life (via `resolveAnswer`);
+ * the score-below-zero check is a separate end-of-run signal that does
+ * NOT consume an additional life. Pure function — extracted so the
+ * rule is unit-testable.
  */
 export function applyAnswerToWorld(
   world: WorldState,
   isCorrect: boolean,
   points: number,
 ): WorldState {
-  const livesBefore = world.lives;
-  let next = resolveAnswer(world, isCorrect, points);
+  const next = resolveAnswer(world, isCorrect, points);
   if (next.runState === 'game-over') return next;
   const total = computeScore(next.tickMs, next.scoreDelta);
-  if (total >= 0) return next;
-  if (!isCorrect && next.lives === livesBefore - 1) {
-    next = { ...next, lives: livesBefore };
+  if (total < 0) {
+    return { ...next, runState: 'game-over' };
   }
-  return { ...next, runState: 'game-over' };
+  return next;
 }
 
 /**
@@ -285,24 +282,15 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     problemModal.show(gate.problem, (result) => {
       const isCorrect =
         result.kind === 'pick' && result.choiceIndex === gate.problem.correctIndex;
-      const livesBefore = world.lives;
       world = applyAnswerToWorld(world, isCorrect, points);
       floatingScore.pop(
         isCorrect ? `+${points}` : `-${points}`,
         isCorrect ? 'green' : 'red',
       );
-      if (
-        world.runState === 'game-over' &&
-        !isCorrect &&
-        world.lives === livesBefore
-      ) {
-        // Life-refund path: log so the behaviour is visible in ?debug=1.
-        console.debug({
-          event: 'life_refunded',
-          reason: 'wrong-answer-ended-run-via-score',
-          livesAfter: world.lives,
-        });
-      }
+      // Push the new lives count to the HUD immediately so the player
+      // sees the deduction even when game-over fires on the same tick
+      // and short-circuits the per-frame HUD update.
+      livesHud.set(world.lives);
       if (world.runState === 'game-over' && !isCorrect) {
         console.debug({
           event: 'run_ended',

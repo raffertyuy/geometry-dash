@@ -71,7 +71,7 @@ describe('derivePauseButtonState', () => {
   });
 });
 
-describe('applyAnswerToWorld — wrong-answer + score-below-zero is a single penalty', () => {
+describe('applyAnswerToWorld', () => {
   const STUB_PROBLEM: Problem = {
     id: 'b01',
     difficulty: 'B',
@@ -109,10 +109,10 @@ describe('applyAnswerToWorld — wrong-answer + score-below-zero is a single pen
     expect(next.runState).toBe('running');
   });
 
-  it('wrong answer that drives score below zero: NO life deducted (refunded), game-over fires', () => {
+  it('wrong answer that drives score below zero: 1 life deducted AND game-over fires (single life cost, no refund)', () => {
     const w = answeringWorld(MAX_LIVES, 0); // any wrong Advanced answer will go below 0
     const next = applyAnswerToWorld(w, false, GATE_POINTS_A);
-    expect(next.lives).toBe(MAX_LIVES); // refunded
+    expect(next.lives).toBe(MAX_LIVES - 1);
     expect(next.scoreDelta).toBe(-GATE_POINTS_A);
     expect(next.runState).toBe('game-over');
   });
@@ -122,13 +122,12 @@ describe('applyAnswerToWorld — wrong-answer + score-below-zero is a single pen
     const next = applyAnswerToWorld(w, false, GATE_POINTS_B);
     expect(next.lives).toBe(0);
     expect(next.runState).toBe('game-over');
-    // No refund here — game-over came from zero lives, not from score-below-zero.
   });
 
-  it('wrong answer at lives === 2 that ALSO drops score below zero: lives refunded to 2 (not 1, not 0)', () => {
+  it('wrong answer at lives === 2 that ALSO drops score below zero: lives go to 1 (one life cost), game-over via score', () => {
     const w = answeringWorld(2, 0);
     const next = applyAnswerToWorld(w, false, GATE_POINTS_A);
-    expect(next.lives).toBe(2);
+    expect(next.lives).toBe(1);
     expect(next.runState).toBe('game-over');
   });
 });
