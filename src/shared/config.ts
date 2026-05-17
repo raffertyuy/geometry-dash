@@ -1,4 +1,4 @@
-import type { Lane } from './types';
+import type { GateDifficulty, Lane } from './types';
 
 export const LANES: readonly Lane[] = ['left', 'centre', 'right'] as const;
 
@@ -62,6 +62,28 @@ export const INVINCIBILITY_DURATION_MS = 3_000;
 export const GATE_POINTS_B = 1_000;
 export const GATE_POINTS_M = 5_000;
 export const GATE_POINTS_A = 10_000;
+
+// Per-question countdown in the gate modal. Difficulty-scaled so harder
+// problems get proportionally more thinking time. Timeout routes through
+// the existing wrong-answer pipeline (see src/renderer/problem-modal.ts).
+export const QUESTION_TIMER_MS_B = 60_000;
+export const QUESTION_TIMER_MS_M = 120_000;
+export const QUESTION_TIMER_MS_A = 180_000;
+export const QUESTION_TIMER_MS_BY_DIFFICULTY: Readonly<
+  Record<GateDifficulty, number>
+> = {
+  B: QUESTION_TIMER_MS_B,
+  M: QUESTION_TIMER_MS_M,
+  A: QUESTION_TIMER_MS_A,
+};
+
+// Threshold (in remaining ms) below which the countdown enters its urgent
+// visual state. One-shot — the timer only decreases.
+export const QUESTION_TIMER_URGENCY_MS = 10_000;
+
+// Display refresh cadence (Hz=4). Fine enough for M:SS rendering without
+// per-frame textContent churn.
+export const QUESTION_TIMER_DISPLAY_INTERVAL_MS = 250;
 
 // Per-lane gate distribution. For every non-obstacle lane in a spawned
 // obstacle row, the spawner independently samples a uniform value from

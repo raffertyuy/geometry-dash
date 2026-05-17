@@ -37,6 +37,15 @@ export interface AnswerChoice {
   readonly text: string;
 }
 
+/**
+ * Outcome the problem-gate modal reports to its caller. `pick` carries the
+ * player's chosen index; `timeout` means the per-question countdown reached
+ * zero with no pick — the game-loop treats it identically to a wrong pick.
+ */
+export type AnswerResult =
+  | { readonly kind: 'pick'; readonly choiceIndex: 0 | 1 | 2 }
+  | { readonly kind: 'timeout' };
+
 export interface Problem {
   readonly id: string;
   readonly difficulty: GateDifficulty;

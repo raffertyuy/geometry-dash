@@ -1,7 +1,27 @@
 // @vitest-environment jsdom
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { createProblemModal } from './problem-modal';
+import {
+  QUESTION_TIMER_MS_A,
+  QUESTION_TIMER_MS_B,
+  QUESTION_TIMER_MS_M,
+} from '../shared/config';
 import type { Problem } from '../shared/types';
+
+const PROBLEM_M: Problem = {
+  id: 'm01',
+  difficulty: 'M',
+  prompt: 'Medium placeholder',
+  choices: [{ text: 'x' }, { text: 'y' }, { text: 'z' }] as const,
+  correctIndex: 2,
+};
+const PROBLEM_A: Problem = {
+  id: 'a01',
+  difficulty: 'A',
+  prompt: 'Advanced placeholder',
+  choices: [{ text: 'p' }, { text: 'q' }, { text: 'r' }] as const,
+  correctIndex: 0,
+};
 
 function makeHost(): HTMLDivElement {
   document.body.innerHTML = '';
@@ -205,7 +225,7 @@ describe('createProblemModal Continue / countdown resolves the answer', () => {
     const continueBtn = host.querySelector('.continue-button') as HTMLButtonElement;
     expect(continueBtn).not.toBeNull();
     continueBtn.click();
-    expect(onResolve).toHaveBeenCalledWith(1);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'pick', choiceIndex: 1 });
     modal.destroy();
   });
 
@@ -215,7 +235,7 @@ describe('createProblemModal Continue / countdown resolves the answer', () => {
     modal.show(TEST_PROBLEM, onResolve);
     dispatchKey(host, 'Enter'); // pick 0
     dispatchKey(host, 'Enter'); // resolve
-    expect(onResolve).toHaveBeenCalledWith(0);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'pick', choiceIndex: 0 });
     modal.destroy();
   });
 
@@ -228,7 +248,7 @@ describe('createProblemModal Continue / countdown resolves the answer', () => {
     expect(onResolve).not.toHaveBeenCalled();
     // Default countdown is 3000 ms; tick past it.
     vi.advanceTimersByTime(3000);
-    expect(onResolve).toHaveBeenCalledWith(0);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'pick', choiceIndex: 0 });
     modal.destroy();
     vi.useRealTimers();
   });
@@ -244,7 +264,7 @@ describe('createProblemModal Continue / countdown resolves the answer', () => {
     checkbox.dispatchEvent(new Event('change', { bubbles: true }));
     // Now the countdown restarts at 1000 ms.
     vi.advanceTimersByTime(1000);
-    expect(onResolve).toHaveBeenCalledWith(0);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'pick', choiceIndex: 0 });
     modal.destroy();
     vi.useRealTimers();
   });
@@ -296,3 +316,242 @@ describe('createProblemModal lifecycle', () => {
     expect(onResolve).not.toHaveBeenCalled();
   });
 });
+
+// ---------- Slice 007: per-question countdown timer -----------------------
+
+describe('question countdown — display', () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    host = makeHost();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'] });
+  });
+  afterEachReset();
+
+  function readDisplay(): string {
+    return host.querySelector('.countdown-question')?.textContent ?? '';
+  }
+
+  it('shows 1:00 / 2:00 / 3:00 on initial render for B / M / A', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    expect(readDisplay()).toBe('1:00');
+    modal.destroy();
+
+    modal.show = createProblemModal(host).show; // fresh
+    const m2 = createProblemModal(host);
+    m2.show(PROBLEM_M, () => undefined);
+    expect(readDisplay()).toBe('2:00');
+    m2.destroy();
+
+    const m3 = createProblemModal(host);
+    m3.show(PROBLEM_A, () => undefined);
+    expect(readDisplay()).toBe('3:00');
+    m3.destroy();
+  });
+
+  it('decrements at 1 Hz across difficulties', () => {
+    const cases: ReadonlyArray<{ problem: Problem; afterOneSec: string; after15Sec: string }> = [
+      { problem: TEST_PROBLEM, afterOneSec: '0:59', after15Sec: '0:45' },
+      { problem: PROBLEM_M, afterOneSec: '1:59', after15Sec: '1:45' },
+      { problem: PROBLEM_A, afterOneSec: '2:59', after15Sec: '2:45' },
+    ];
+    for (const { problem, afterOneSec, after15Sec } of cases) {
+      host = makeHost();
+      const modal = createProblemModal(host);
+      modal.show(problem, () => undefined);
+      vi.advanceTimersByTime(1000);
+      expect(readDisplay()).toBe(afterOneSec);
+      vi.advanceTimersByTime(14_000);
+      expect(readDisplay()).toBe(after15Sec);
+      modal.destroy();
+    }
+  });
+});
+
+describe('question countdown — stop on pick', () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    host = makeHost();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'] });
+  });
+  afterEachReset();
+
+  it('freezes the displayed text immediately after a pick', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    vi.advanceTimersByTime(20_000); // 0:40
+    expect(host.querySelector('.countdown-question')?.textContent).toBe('0:40');
+    dispatchKey(host, 'Enter'); // pick choice 0 — stops the timer
+    const frozen = host.querySelector('.countdown-question')?.textContent;
+    vi.advanceTimersByTime(30_000); // would normally tick to 0:10
+    expect(host.querySelector('.countdown-question')?.textContent).toBe(frozen);
+    modal.destroy();
+  });
+
+  it('does NOT emit gate_timer_expired when answered in time', () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    vi.advanceTimersByTime(10_000);
+    dispatchKey(host, 'Enter');
+    vi.advanceTimersByTime(120_000);
+    const calls = debugSpy.mock.calls.flat() as Array<Record<string, unknown>>;
+    expect(calls.some((c) => c && c['event'] === 'gate_timer_expired')).toBe(false);
+    modal.destroy();
+    debugSpy.mockRestore();
+  });
+});
+
+describe('question countdown — monotonic-clock drift', () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    host = makeHost();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'] });
+  });
+  afterEachReset();
+
+  it('reports exact monotonic remaining time after non-uniform clock jumps', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    // Big jump, then small jump — verifies math uses elapsed wall-clock,
+    // not a per-tick decrement count. Stop short of timeout to keep the
+    // timer in 'running' state for inspection.
+    vi.advanceTimersByTime(QUESTION_TIMER_MS_B - 5_000);
+    expect(modal.getDebugSnapshot()!.remainingMs).toBe(5_000);
+    vi.advanceTimersByTime(1);
+    expect(modal.getDebugSnapshot()!.remainingMs).toBe(4_999);
+    modal.destroy();
+  });
+
+  it('clamps the displayed countdown at 0:00 when fully consumed', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    // Advance just past the exact duration so the next interval/rAF tick
+    // observes remaining <= 0 and fires the timeout, then assert the
+    // displayed text never went negative.
+    vi.advanceTimersByTime(QUESTION_TIMER_MS_B + 100);
+    const text = host.querySelector('.countdown-question')?.textContent ?? '';
+    expect(text === "Hurry! 0:00" || text === '0:00').toBe(true);
+    modal.destroy();
+  });
+});
+
+describe('question countdown — timeout routes to wrong-answer', () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    host = makeHost();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'] });
+  });
+  afterEachReset();
+
+  function runTimeout(problem: Problem, durationMs: number): ReturnType<typeof vi.fn> {
+    const modal = createProblemModal(host);
+    const onResolve = vi.fn();
+    modal.show(problem, onResolve);
+    // Past the question countdown into the 3 s review auto-continue.
+    vi.advanceTimersByTime(durationMs + 3_500);
+    modal.destroy();
+    return onResolve;
+  }
+
+  it('calls onResolve with { kind: "timeout" } for Basic gates', () => {
+    const onResolve = runTimeout(TEST_PROBLEM, QUESTION_TIMER_MS_B);
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'timeout' });
+  });
+
+  it('calls onResolve with { kind: "timeout" } for Medium gates', () => {
+    const onResolve = runTimeout(PROBLEM_M, QUESTION_TIMER_MS_M);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'timeout' });
+  });
+
+  it('calls onResolve with { kind: "timeout" } for Advanced gates', () => {
+    const onResolve = runTimeout(PROBLEM_A, QUESTION_TIMER_MS_A);
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'timeout' });
+  });
+
+  it('emits gate_timer_expired on the timeout transition', () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    vi.advanceTimersByTime(QUESTION_TIMER_MS_B + 100);
+    const calls = debugSpy.mock.calls.flat() as Array<Record<string, unknown>>;
+    expect(
+      calls.some(
+        (c) =>
+          c &&
+          c['event'] === 'gate_timer_expired' &&
+          c['difficulty'] === 'B',
+      ),
+    ).toBe(true);
+    modal.destroy();
+    debugSpy.mockRestore();
+  });
+
+  it('shows the timeout review state: correct answer highlighted, no wrong-pick marker, "Time\'s up" feedback', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    vi.advanceTimersByTime(QUESTION_TIMER_MS_B + 50); // past timeout, before auto-continue
+    expect(host.classList.contains('is-reviewing')).toBe(true);
+    expect(host.classList.contains('is-incorrect')).toBe(true);
+    expect(host.classList.contains('is-correct')).toBe(false);
+    const choices = host.querySelectorAll('.answer-choice');
+    expect(choices[TEST_PROBLEM.correctIndex]!.classList.contains('is-correct-answer')).toBe(
+      true,
+    );
+    for (const el of Array.from(choices)) {
+      expect(el.classList.contains('is-wrong-pick')).toBe(false);
+    }
+    expect(host.querySelector('.review-feedback')?.textContent).toBe("Time's up");
+    modal.destroy();
+  });
+});
+
+describe('question countdown — urgency cue', () => {
+  let host: HTMLDivElement;
+  beforeEach(() => {
+    host = makeHost();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'Date'] });
+  });
+  afterEachReset();
+
+  it('is calm above 10 s and urgent at or below 10 s', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    const el = host.querySelector('.countdown-question') as HTMLElement;
+    expect(el.classList.contains('countdown-question--urgent')).toBe(false);
+    expect(el.textContent).toMatch(/^\d:\d\d$/);
+
+    // Advance to 11 s remaining — still calm.
+    vi.advanceTimersByTime(QUESTION_TIMER_MS_B - 11_000);
+    expect(el.classList.contains('countdown-question--urgent')).toBe(false);
+
+    // Advance one more second — exactly 10 s remaining, urgent threshold tripped.
+    vi.advanceTimersByTime(1_000);
+    expect(el.classList.contains('countdown-question--urgent')).toBe(true);
+    expect(el.textContent?.startsWith('Hurry! ')).toBe(true);
+
+    modal.destroy();
+  });
+
+  it('reports stopped-by-answer status when the player answers during urgency', () => {
+    const modal = createProblemModal(host);
+    modal.show(TEST_PROBLEM, () => undefined);
+    vi.advanceTimersByTime(QUESTION_TIMER_MS_B - 5_000); // urgent
+    const el = host.querySelector('.countdown-question') as HTMLElement;
+    expect(el.classList.contains('countdown-question--urgent')).toBe(true);
+    dispatchKey(host, 'Enter');
+    const snap = modal.getDebugSnapshot();
+    expect(snap).not.toBeNull();
+    expect(snap!.status).toBe('stopped-by-answer');
+    modal.destroy();
+  });
+});
+
+// Each new describe block calls this in its beforeEach scope so fake timers
+// are reset between tests without leaking into earlier suites.
+function afterEachReset(): void {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+}

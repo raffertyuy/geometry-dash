@@ -215,8 +215,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // the game-loop since it needs computeScore from the score module.
   function showProblemModal(gate: ProblemGate): void {
     const points = GATE_CATALOGUE[gate.difficulty].points;
-    problemModal.show(gate.problem, (choiceIndex) => {
-      const isCorrect = choiceIndex === gate.problem.correctIndex;
+    problemModal.show(gate.problem, (result) => {
+      const isCorrect =
+        result.kind === 'pick' && result.choiceIndex === gate.problem.correctIndex;
       world = resolveAnswer(world, isCorrect, points);
       floatingScore.pop(
         isCorrect ? `+${points}` : `-${points}`,
@@ -470,7 +471,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     renderer.updateObstacles(obstacles);
     renderer.updateGates(gates, world.tickMs);
     renderer.draw(player, world);
-    debugOverlay.update(player, world, lastInput);
+    debugOverlay.update(player, world, lastInput, problemModal.getDebugSnapshot());
     livesHud.set(world.lives);
     host.score.textContent = formatScore(
       computeScore(world.tickMs, world.scoreDelta),

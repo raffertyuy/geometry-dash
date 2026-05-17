@@ -2,7 +2,12 @@ import { DEBUG } from '../shared/config';
 import type { InputEvent, PlayerState, WorldState } from '../shared/types';
 
 export interface DebugOverlay {
-  update(player: PlayerState, world: WorldState, lastInput?: InputEvent): void;
+  update(
+    player: PlayerState,
+    world: WorldState,
+    lastInput?: InputEvent,
+    questionTimer?: { remainingMs: number; urgent: boolean } | null,
+  ): void;
   destroy(): void;
 }
 
@@ -18,6 +23,7 @@ export function createDebugOverlay(host: HTMLElement | null): DebugOverlay {
     p: PlayerState,
     w: WorldState,
     lastInput?: InputEvent,
+    questionTimer?: { remainingMs: number; urgent: boolean } | null,
   ): void {
     const lines = [
       `lane:      ${p.currentLane}${p.targetLane ? ` -> ${p.targetLane}` : ''}`,
@@ -29,6 +35,11 @@ export function createDebugOverlay(host: HTMLElement | null): DebugOverlay {
       `tickMs:    ${w.tickMs.toFixed(0)}`,
       `lastInput: ${lastInput ? `${lastInput.direction} (${lastInput.source})` : '-'}`,
     ];
+    if (questionTimer) {
+      lines.push(
+        `Q-Timer:   ${(questionTimer.remainingMs / 1000).toFixed(1)} s${questionTimer.urgent ? ' (urgent)' : ''}`,
+      );
+    }
     // host is captured by closure.
     (host as HTMLElement).textContent = lines.join('\n');
   }

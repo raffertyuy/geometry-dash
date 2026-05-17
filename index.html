@@ -202,6 +202,27 @@
         text-shadow: 0 0 6px currentColor;
       }
 
+      #problem-modal .countdown-question {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: clamp(1.4rem, 3.4vw, 1.8rem);
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: #c8c8d8;
+        text-align: center;
+      }
+
+      #problem-modal .countdown-question--urgent {
+        color: #ff4455;
+        text-shadow: 0 0 10px rgba(255, 68, 85, 0.6);
+        animation: question-countdown-pulse 1s ease-in-out infinite;
+      }
+
+      @keyframes question-countdown-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50%      { transform: scale(1.06); opacity: 0.85; }
+      }
+
       #problem-modal .problem-text {
         font-size: clamp(1.1rem, 3vw, 1.6rem);
         font-weight: 600;

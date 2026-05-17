@@ -1,11 +1,22 @@
 import { GATE_CATALOGUE } from '../problem-gates';
-import type { Problem } from '../shared/types';
+import {
+  QUESTION_TIMER_DISPLAY_INTERVAL_MS,
+  QUESTION_TIMER_MS_BY_DIFFICULTY,
+  QUESTION_TIMER_URGENCY_MS,
+} from '../shared/config';
+import type { AnswerResult, Problem } from '../shared/types';
 import { mathText } from './math-text';
 
 export interface ProblemModal {
-  show(problem: Problem, onResolve: (choiceIndex: 0 | 1 | 2) => void): void;
+  show(problem: Problem, onResolve: (result: AnswerResult) => void): void;
   hide(): void;
   destroy(): void;
+  /** Test/debug-only seam. Returns null when no modal is open. */
+  getDebugSnapshot(): {
+    readonly remainingMs: number;
+    readonly status: 'running' | 'stopped-by-answer' | 'expired';
+    readonly urgent: boolean;
+  } | null;
 }
 
 const KEY_NAV_PREV = new Set(['ArrowLeft', 'ArrowUp', 'a', 'A', 'w', 'W']);
@@ -54,7 +65,7 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
   let highlight: 0 | 1 | 2 = 0;
   let pickedIndex: 0 | 1 | 2 | null = null;
   let currentProblem: Problem | null = null;
-  let onResolveCb: ((choiceIndex: 0 | 1 | 2) => void) | null = null;
+  let onResolveCb: ((result: AnswerResult) => void) | null = null;
   let countdownIntervalId: ReturnType<typeof setInterval> | null = null;
   let countdownRemainingMs = 0;
   let choiceElements: HTMLElement[] = [];
@@ -62,11 +73,144 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
   let autoContinueCheckbox: HTMLInputElement | null = null;
   let countdownDisplay: HTMLElement | null = null;
 
-  function clearTimers(): void {
+  // ---- Question countdown (per-difficulty: 60/120/180 s) -----------------
+  // Separate from the review-state auto-continue countdown above. This one
+  // is wall-clock-driven via performance.now() so background-tab throttling
+  // cannot grant the player extra time. See specs/007-problem-timer.
+  let qTimerInitialMs = 0;
+  let qTimerStartedAtMs = 0;
+  let qTimerPausedAccumulatedMs = 0;
+  let qTimerPausedAtMs: number | null = null;
+  let qTimerStatus: 'idle' | 'running' | 'stopped-by-answer' | 'expired' = 'idle';
+  let qTimerDisplayIntervalId: ReturnType<typeof setInterval> | null = null;
+  let qTimerRafId: number | null = null;
+  let qTimerLastDisplayedSeconds = -1;
+  let qTimerLastDisplayedUrgent = false;
+  let questionCountdownEl: HTMLElement | null = null;
+
+  function questionTimerRemainingMs(): number {
+    if (qTimerStatus === 'idle') return 0;
+    const now = qTimerPausedAtMs ?? performance.now();
+    const elapsed = now - qTimerStartedAtMs - qTimerPausedAccumulatedMs;
+    return Math.max(0, qTimerInitialMs - elapsed);
+  }
+
+  function formatMSS(ms: number): string {
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec - m * 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function refreshQuestionCountdownDisplay(): void {
+    if (!questionCountdownEl || qTimerStatus !== 'running') return;
+    const remaining = questionTimerRemainingMs();
+    const urgent = remaining <= QUESTION_TIMER_URGENCY_MS;
+    const totalSecondsLeft = Math.ceil(remaining / 1000);
+    if (
+      totalSecondsLeft !== qTimerLastDisplayedSeconds ||
+      urgent !== qTimerLastDisplayedUrgent
+    ) {
+      qTimerLastDisplayedSeconds = totalSecondsLeft;
+      qTimerLastDisplayedUrgent = urgent;
+      const base = formatMSS(remaining);
+      questionCountdownEl.textContent = urgent ? `Hurry! ${base}` : base;
+      questionCountdownEl.classList.toggle('countdown-question--urgent', urgent);
+    }
+    if (remaining <= 0) {
+      handleQuestionTimeout();
+    }
+  }
+
+  function scheduleQuestionTimerRaf(): void {
+    if (qTimerStatus !== 'running') return;
+    const raf =
+      win.requestAnimationFrame ??
+      ((cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 16) as unknown as number);
+    qTimerRafId = raf(() => {
+      qTimerRafId = null;
+      refreshQuestionCountdownDisplay();
+      scheduleQuestionTimerRaf();
+    });
+  }
+
+  function startQuestionTimer(): void {
+    if (!currentProblem) return;
+    qTimerInitialMs = QUESTION_TIMER_MS_BY_DIFFICULTY[currentProblem.difficulty];
+    qTimerStartedAtMs = performance.now();
+    qTimerPausedAccumulatedMs = 0;
+    qTimerPausedAtMs = null;
+    qTimerStatus = 'running';
+    qTimerLastDisplayedSeconds = -1;
+    qTimerLastDisplayedUrgent = false;
+    // Eager initial render so the modal shows the exact starting M:SS within
+    // milliseconds of becoming visible (spec SC-001 ±100 ms).
+    refreshQuestionCountdownDisplay();
+    qTimerDisplayIntervalId = setInterval(
+      refreshQuestionCountdownDisplay,
+      QUESTION_TIMER_DISPLAY_INTERVAL_MS,
+    );
+    scheduleQuestionTimerRaf();
+    console.debug({
+      event: 'gate_timer_started',
+      problemId: currentProblem?.id,
+      difficulty: currentProblem.difficulty,
+      durationMs: qTimerInitialMs,
+    });
+  }
+
+  function stopQuestionTimer(
+    reason: 'stopped-by-answer' | 'expired' | 'closed',
+  ): void {
+    const wasRunning = qTimerStatus === 'running';
+    if (qTimerDisplayIntervalId !== null) {
+      clearInterval(qTimerDisplayIntervalId);
+      qTimerDisplayIntervalId = null;
+    }
+    if (qTimerRafId !== null) {
+      const caf = win.cancelAnimationFrame ?? clearTimeout;
+      caf(qTimerRafId);
+      qTimerRafId = null;
+    }
+    if (wasRunning && reason !== 'closed') {
+      qTimerStatus = reason === 'expired' ? 'expired' : 'stopped-by-answer';
+      if (reason === 'stopped-by-answer') {
+        console.debug({
+          event: 'gate_timer_stopped_by_answer',
+          problemId: currentProblem?.id,
+          choiceIndex: pickedIndex,
+          remainingMs: questionTimerRemainingMs(),
+        });
+      }
+    } else if (reason === 'closed') {
+      qTimerStatus = 'idle';
+    }
+  }
+
+  function handleQuestionTimeout(): void {
+    if (qTimerStatus !== 'running' || state !== 'choosing') return;
+    stopQuestionTimer('expired');
+    console.debug({
+      event: 'gate_timer_expired',
+      problemId: currentProblem?.id,
+      difficulty: currentProblem?.difficulty,
+    });
+    state = 'reviewing';
+    pickedIndex = null;
+    syncReviewingFeedback();
+    startCountdown();
+  }
+
+  function clearReviewCountdown(): void {
     if (countdownIntervalId !== null) {
       clearInterval(countdownIntervalId);
       countdownIntervalId = null;
     }
+  }
+
+  function clearTimers(): void {
+    clearReviewCountdown();
+    stopQuestionTimer('closed');
   }
 
   function buildBody(problem: Problem): void {
@@ -79,6 +223,14 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     difficultyBadge.style.color = dInfo.colorHex;
     difficultyBadge.textContent = `${dInfo.label} · ±${dInfo.points} pts`;
     host.appendChild(difficultyBadge);
+
+    // Per-question countdown (B=60s / M=120s / A=180s). Wall-clock-driven.
+    questionCountdownEl = doc.createElement('div');
+    questionCountdownEl.className = 'countdown-question';
+    questionCountdownEl.textContent = formatMSS(
+      QUESTION_TIMER_MS_BY_DIFFICULTY[problem.difficulty],
+    );
+    host.appendChild(questionCountdownEl);
 
     const prompt = doc.createElement('div');
     prompt.className = 'problem-text';
@@ -158,8 +310,9 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
   }
 
   function syncReviewingFeedback(): void {
-    if (currentProblem === null || pickedIndex === null) return;
-    const isCorrect = pickedIndex === currentProblem.correctIndex;
+    if (currentProblem === null) return;
+    const isTimeout = pickedIndex === null;
+    const isCorrect = !isTimeout && pickedIndex === currentProblem.correctIndex;
     host.classList.remove('is-choosing');
     host.classList.add('is-reviewing');
     host.classList.add(isCorrect ? 'is-correct' : 'is-incorrect');
@@ -169,12 +322,16 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
       el.classList.toggle('is-correct-answer', i === currentProblem.correctIndex);
       el.classList.toggle(
         'is-wrong-pick',
-        !isCorrect && i === pickedIndex,
+        !isTimeout && !isCorrect && i === pickedIndex,
       );
     }
     const feedback = host.querySelector('.review-feedback');
     if (feedback instanceof HTMLElement) {
-      feedback.textContent = isCorrect ? 'Correct!' : 'Incorrect';
+      feedback.textContent = isTimeout
+        ? "Time's up"
+        : isCorrect
+          ? 'Correct!'
+          : 'Incorrect';
     }
   }
 
@@ -187,7 +344,7 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
   function startCountdown(): void {
     countdownRemainingMs = autoContinuePref ? COUNTDOWN_AUTO_MS : COUNTDOWN_DEFAULT_MS;
     updateCountdownDisplay();
-    clearTimers();
+    clearReviewCountdown();
     countdownIntervalId = setInterval(() => {
       countdownRemainingMs -= COUNTDOWN_TICK_MS;
       if (countdownRemainingMs <= 0) {
@@ -200,14 +357,15 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
 
   function pick(choiceIndex: 0 | 1 | 2): void {
     if (state !== 'choosing') return;
-    state = 'reviewing';
     pickedIndex = choiceIndex;
+    stopQuestionTimer('stopped-by-answer');
+    state = 'reviewing';
     syncReviewingFeedback();
     startCountdown();
   }
 
   function resolve(): void {
-    if (state !== 'reviewing' || pickedIndex === null) return;
+    if (state !== 'reviewing') return;
     const cb = onResolveCb;
     const idx = pickedIndex;
     state = 'closed';
@@ -215,7 +373,9 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     onResolveCb = null;
     clearTimers();
     teardownListeners();
-    if (cb) cb(idx);
+    if (cb) {
+      cb(idx === null ? { kind: 'timeout' } : { kind: 'pick', choiceIndex: idx });
+    }
   }
 
   function onKeyDown(event: Event): void {
@@ -292,7 +452,7 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
 
   function show(
     problem: Problem,
-    onResolve: (choiceIndex: 0 | 1 | 2) => void,
+    onResolve: (result: AnswerResult) => void,
   ): void {
     currentProblem = problem;
     onResolveCb = onResolve;
@@ -304,6 +464,7 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     host.classList.add('is-choosing');
     host.classList.remove('hidden');
     setupListeners();
+    startQuestionTimer();
   }
 
   function hide(): void {
@@ -316,6 +477,7 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     continueButton = null;
     autoContinueCheckbox = null;
     countdownDisplay = null;
+    questionCountdownEl = null;
     state = 'closed';
     currentProblem = null;
     onResolveCb = null;
@@ -330,8 +492,23 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     continueButton = null;
     autoContinueCheckbox = null;
     countdownDisplay = null;
+    questionCountdownEl = null;
     onResolveCb = null;
   }
 
-  return { show, hide, destroy };
+  function getDebugSnapshot(): {
+    readonly remainingMs: number;
+    readonly status: 'running' | 'stopped-by-answer' | 'expired';
+    readonly urgent: boolean;
+  } | null {
+    if (qTimerStatus === 'idle') return null;
+    const remainingMs = questionTimerRemainingMs();
+    return {
+      remainingMs,
+      status: qTimerStatus,
+      urgent: remainingMs <= QUESTION_TIMER_URGENCY_MS,
+    };
+  }
+
+  return { show, hide, destroy, getDebugSnapshot };
 }
