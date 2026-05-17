@@ -27,12 +27,15 @@ import {
   tickInvincibility,
   tickWorld,
 } from '../runner-engine';
+import { PROBLEM_SOURCES } from '../problems/sources';
 import {
+  createCreditsPanel,
   createDebugOverlay,
   createFloatingScore,
   createLivesHud,
   createProblemModal,
   createThreeRenderer,
+  type CreditsPanel,
   type DebugOverlay,
   type FloatingScore,
   type LivesHud,
@@ -65,6 +68,9 @@ export interface GameLoopHostElements {
   readonly gameOverTimer: HTMLElement;
   readonly problemModal: HTMLElement;
   readonly floatingScores: HTMLElement;
+  readonly creditsOverlay: HTMLElement;
+  readonly creditsLinkStart: HTMLElement;
+  readonly creditsLinkGameOver: HTMLElement;
 }
 
 export interface GameLoopHandles {
@@ -103,6 +109,27 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   const livesHud: LivesHud = createLivesHud(host.livesHud);
   const problemModal: ProblemModal = createProblemModal(host.problemModal);
   const floatingScore: FloatingScore = createFloatingScore(host.floatingScores);
+  const creditsPanel: CreditsPanel = createCreditsPanel(
+    host.creditsOverlay,
+    PROBLEM_SOURCES,
+  );
+  function openCredits(event: Event): void {
+    event.stopPropagation();
+    creditsPanel.show();
+  }
+  function stopCreditsLinkPointer(event: Event): void {
+    // The window-level onPointerDown handler would otherwise read this
+    // bubble and call beginRun() / restartFromInput() before our click
+    // listener fires. Swallow it at the link so the credits-link tap is
+    // only a credits-link tap.
+    event.stopPropagation();
+  }
+  host.creditsLinkStart.addEventListener('click', openCredits);
+  host.creditsLinkGameOver.addEventListener('click', openCredits);
+  host.creditsLinkStart.addEventListener('pointerdown', stopCreditsLinkPointer);
+  host.creditsLinkGameOver.addEventListener('pointerdown', stopCreditsLinkPointer);
+  host.creditsLinkStart.addEventListener('pointerup', stopCreditsLinkPointer);
+  host.creditsLinkGameOver.addEventListener('pointerup', stopCreditsLinkPointer);
   livesHud.set(MAX_LIVES);
 
   function showStartScreen(visible: boolean): void {
@@ -224,6 +251,9 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // ---- DOM event bridging ----
 
   function onKeyDown(event: KeyboardEvent): void {
+    // Credits panel owns the keyboard while visible (Escape closes it).
+    // Don't let stray keystrokes start or restart the run behind it.
+    if (creditsPanel.isVisible()) return;
     if (loopState === 'start-screen') {
       beginRun();
       return; // do not also drive lane-state with the press that started the run
@@ -244,6 +274,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   }
 
   function onPointerDown(event: PointerEvent): void {
+    // While the credits panel is up, taps either land inside its body or
+    // hit the backdrop. The panel's own click handler closes on backdrop
+    // hits; the game-loop should not also start or restart the run.
+    if (creditsPanel.isVisible()) return;
     if (loopState === 'start-screen') {
       beginRun();
       return;
@@ -456,6 +490,13 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     window.removeEventListener('focus', onFocus);
     window.removeEventListener('resize', onResize);
     document.removeEventListener('visibilitychange', onVisibilityChange);
+    host.creditsLinkStart.removeEventListener('click', openCredits);
+    host.creditsLinkGameOver.removeEventListener('click', openCredits);
+    host.creditsLinkStart.removeEventListener('pointerdown', stopCreditsLinkPointer);
+    host.creditsLinkGameOver.removeEventListener('pointerdown', stopCreditsLinkPointer);
+    host.creditsLinkStart.removeEventListener('pointerup', stopCreditsLinkPointer);
+    host.creditsLinkGameOver.removeEventListener('pointerup', stopCreditsLinkPointer);
+    creditsPanel.destroy();
     problemModal.destroy();
     floatingScore.destroy();
     livesHud.destroy();

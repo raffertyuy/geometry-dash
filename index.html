@@ -423,6 +423,140 @@
         transform: translateY(-72px);
         opacity: 0;
       }
+
+      /* Problem credits — a small Tron-cyan text button shown on the start
+         and game-over overlays beneath the existing instructions. The
+         parent .overlay has pointer-events: none for its children so the
+         underlying canvas can still receive input; we re-enable it here. */
+      .credits-link {
+        appearance: none;
+        background: transparent;
+        border: 1px solid rgba(24, 200, 255, 0.35);
+        border-radius: 4px;
+        color: #18c8ff;
+        cursor: pointer;
+        font: inherit;
+        font-size: clamp(0.85rem, 1.8vw, 1.05rem);
+        margin-top: 0.6em;
+        padding: 0.45em 0.9em;
+        pointer-events: auto;
+        text-shadow: 0 0 4px rgba(24, 200, 255, 0.4);
+        transition: background 120ms ease-out, border-color 120ms ease-out;
+      }
+
+      .credits-link:hover,
+      .credits-link:focus-visible {
+        background: rgba(24, 200, 255, 0.12);
+        border-color: rgba(24, 200, 255, 0.7);
+        outline: none;
+      }
+
+      /* Credits overlay. Reuses .overlay backdrop but is a stand-alone
+         layer (not the start or game-over overlay). The .credits-body
+         is a centred scrollable panel. */
+      #credits-overlay {
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        pointer-events: auto; /* enable backdrop click-to-close */
+      }
+
+      #credits-overlay .credits-body {
+        background: rgba(8, 12, 24, 0.95);
+        border: 1px solid rgba(24, 200, 255, 0.35);
+        border-radius: 8px;
+        box-shadow: 0 0 24px rgba(24, 200, 255, 0.2);
+        color: #e8e8ef;
+        max-height: 80vh;
+        max-width: min(92vw, 640px);
+        overflow-y: auto;
+        padding: 1.4rem 1.6rem 1.2rem;
+        pointer-events: auto;
+        position: relative;
+        text-align: left;
+        width: 100%;
+      }
+
+      #credits-overlay h2 {
+        color: #18c8ff;
+        font-size: clamp(1.2rem, 3.4vw, 1.6rem);
+        margin: 0 0 0.6em 0;
+        text-shadow: 0 0 8px rgba(24, 200, 255, 0.4);
+      }
+
+      #credits-overlay .credits-intro {
+        color: #c0c0d0;
+        font-size: clamp(0.9rem, 2vw, 1rem);
+        margin: 0 0 1em 0;
+      }
+
+      #credits-overlay .credits-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1em;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      #credits-overlay .source-entry {
+        border-left: 2px solid rgba(24, 200, 255, 0.35);
+        display: flex;
+        flex-direction: column;
+        gap: 0.25em;
+        padding: 0.2em 0 0.2em 0.8em;
+      }
+
+      #credits-overlay .source-name {
+        color: #e8e8ef;
+        font-size: clamp(0.95rem, 2.2vw, 1.05rem);
+        font-weight: 600;
+      }
+
+      #credits-overlay .source-url {
+        color: #18c8ff;
+        font-size: clamp(0.8rem, 1.7vw, 0.9rem);
+        text-decoration: underline;
+        word-break: break-all;
+      }
+
+      #credits-overlay .source-url:hover,
+      #credits-overlay .source-url:focus-visible {
+        color: #6be5ff;
+        outline: none;
+      }
+
+      #credits-overlay .source-license {
+        color: #9090a0;
+        font-size: clamp(0.8rem, 1.7vw, 0.9rem);
+      }
+
+      #credits-overlay .source-attribution {
+        color: #c0c0d0;
+        font-size: clamp(0.8rem, 1.7vw, 0.9rem);
+        font-style: italic;
+      }
+
+      #credits-overlay .close-button {
+        appearance: none;
+        background: transparent;
+        border: none;
+        color: #9090a0;
+        cursor: pointer;
+        font-size: 1.4rem;
+        line-height: 1;
+        padding: 0.2em 0.5em;
+        position: absolute;
+        right: 0.5em;
+        top: 0.4em;
+        transition: color 120ms ease-out;
+      }
+
+      #credits-overlay .close-button:hover,
+      #credits-overlay .close-button:focus-visible {
+        color: #18c8ff;
+        outline: none;
+      }
     </style>
   </head>
   <body>
@@ -433,6 +567,7 @@
       <p>Press any key or tap to start</p>
       <p class="hint">Arrow keys / WASD on desktop
 Swipe left or right on mobile</p>
+      <button id="credits-link-start" class="credits-link" type="button">Problem credits</button>
     </div>
 
     <div id="pause-overlay" class="overlay hidden">
@@ -453,9 +588,12 @@ Swipe left or right on mobile</p>
       <p class="hud-label">Time</p>
       <p class="game-over-stat" id="game-over-timer">0:00</p>
       <p class="hint">Tap or press any key to play again</p>
+      <button id="credits-link-game-over" class="credits-link" type="button">Problem credits</button>
     </div>
 
     <div id="problem-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Problem"></div>
+
+    <div id="credits-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Problem credits"></div>
 
     <div id="floating-scores" aria-hidden="true"></div>
 
