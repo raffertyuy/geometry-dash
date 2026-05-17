@@ -48,16 +48,16 @@ Constraints to keep in mind:
 - `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
-**Active feature**: `004-difficulty-escalation` — Every 30 seconds run speed scales by 1.10x and the score per 0.1s increases by 1.
+**Active feature**: `005-problem-gates` — Question-answer "problem gates" (B/M/A difficulty, glowing Rubik's-cube meshes in muted green/orange/red) co-spawn with obstacles; collision opens a modal with three answer choices; correct/wrong = ±1k/5k/10k points + (on wrong) −1 life. 3 lives per run (geometric heart icons in HUD); obstacle hits now cost a life + respawn in centre lane with 3 s blinking invincibility. Game-over on either 0 lives or score < 0. Placeholder problems for now.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/004-difficulty-escalation/plan.md` (technical context + constitution check + project tree)
-- `specs/004-difficulty-escalation/spec.md` (user stories, requirements, success criteria)
-- `specs/004-difficulty-escalation/research.md` (Phase 0 decisions for this slice)
-- `specs/004-difficulty-escalation/data-model.md` (derived tier + piecewise score formula)
-- `specs/004-difficulty-escalation/contracts/module-contracts.md` (new `src/escalation/` module API + `computeScore` rewrite + `tickWorld` optional param)
-- `specs/004-difficulty-escalation/quickstart.md` (slice-specific validation steps)
+- `specs/005-problem-gates/plan.md` (technical context + constitution check + project tree)
+- `specs/005-problem-gates/spec.md` (user stories, requirements, success criteria)
+- `specs/005-problem-gates/research.md` (Phase 0 decisions for this slice)
+- `specs/005-problem-gates/data-model.md` (new entities, WorldState extensions, lifecycle with the new `'answering'` state)
+- `specs/005-problem-gates/contracts/module-contracts.md` (new `src/problem-gates/` + `src/problems/` modules + renderer DOM helpers + runner-engine transitions + `computeScore` parameter extension)
+- `specs/005-problem-gates/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture is captured in `specs/001-lane-runner/`, `specs/002-scoring-hud/`, and `specs/003-obstacles/`. This slice introduces the game's first **progression curve** — by tier ~20 the world becomes effectively unsurvivable, which is the natural endgame.
+The foundational architecture is captured in `specs/001-lane-runner/`, `specs/002-scoring-hud/`, `specs/003-obstacles/`, and `specs/004-difficulty-escalation/`. This slice introduces the game's first **question-answer mechanic** and the **lives system** that makes the runner game survivable across more than one mistake.
 <!-- SPECKIT END -->
