@@ -135,6 +135,16 @@ const GATE_SPIN_PERIOD_MS = 9000; // slow constant Y-spin for "alive" feel
 const GATE_CANDLE_PERIOD_MS = 2400;
 const GATE_HALO_SCALE = 2.6; // outer-glow halo size relative to cube
 const GATE_QMARK_SCALE = 1.05; // question-mark sprite size relative to cube
+// Per-difficulty glow scale. The three neon cube colours have very
+// different perceptual luminance (Rec.709-ish):
+//   green  #44ff77  ≈ 0.81
+//   yellow #ffe933  ≈ 0.88
+//   red    #ff4455  ≈ 0.43
+// Without compensation green and yellow bloom roughly 2× harder than
+// red, which is what makes them wash out the "?" glyph. We scale the
+// emissive intensity AND halo opacity per difficulty so all three
+// cubes read at roughly the same visual brightness. Red is the
+// baseline at 1.0; the others get dampened.
 
 const OBSTACLE_POOL_SIZE = 12;
 const OBSTACLE_HEIGHTS: Readonly<Record<ObstacleVariantId, number>> = {
@@ -654,6 +664,14 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     M: makeGateBodyMaterial('M'),
     A: makeGateBodyMaterial('A'),
   };
+
+  // Per-difficulty glow scale - dampens green and yellow so they don't
+  // outshine red (see comment near GATE_HALO_SCALE for the luminance math).
+  const GATE_GLOW_SCALE: Readonly<Record<GateDifficulty, number>> = {
+    B: 0.55, // green
+    M: 0.50, // yellow (highest luminance of the three)
+    A: 1.00, // red - baseline
+  };
   const gateEdgeMaterials: Readonly<Record<GateDifficulty, LineMaterial>> = {
     B: makeGateEdgeMaterial('B'),
     M: makeGateEdgeMaterial('M'),
@@ -747,12 +765,15 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     const emissive = 0.4 + 1.2 * intensity01; // [0.4, 1.6]
     const haloOpacity = 0.2 + 0.7 * intensity01; // [0.2, 0.9]
 
-    gateBodyMaterials.B.emissiveIntensity = emissive;
-    gateBodyMaterials.M.emissiveIntensity = emissive;
-    gateBodyMaterials.A.emissiveIntensity = emissive;
-    gateHaloMaterials.B.opacity = haloOpacity;
-    gateHaloMaterials.M.opacity = haloOpacity;
-    gateHaloMaterials.A.opacity = haloOpacity;
+    // Apply the per-difficulty glow scale to both emissive intensity
+    // and halo opacity so the three cubes read at perceptually equal
+    // brightness even though their hex luminance differs by ~2×.
+    gateBodyMaterials.B.emissiveIntensity = emissive * GATE_GLOW_SCALE.B;
+    gateBodyMaterials.M.emissiveIntensity = emissive * GATE_GLOW_SCALE.M;
+    gateBodyMaterials.A.emissiveIntensity = emissive * GATE_GLOW_SCALE.A;
+    gateHaloMaterials.B.opacity = haloOpacity * GATE_GLOW_SCALE.B;
+    gateHaloMaterials.M.opacity = haloOpacity * GATE_GLOW_SCALE.M;
+    gateHaloMaterials.A.opacity = haloOpacity * GATE_GLOW_SCALE.A;
 
     let used = 0;
     for (const g of gates) {
