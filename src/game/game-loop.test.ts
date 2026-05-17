@@ -109,12 +109,14 @@ describe('applyAnswerToWorld', () => {
     expect(next.runState).toBe('running');
   });
 
-  it('wrong answer that drives score below zero: 1 life deducted AND game-over fires (single life cost, no refund)', () => {
-    const w = answeringWorld(MAX_LIVES, 0); // any wrong Advanced answer will go below 0
+  it('wrong answer that would drive score below zero (lives remain): -1 life, score clamps to 0, run continues', () => {
+    const w = answeringWorld(MAX_LIVES, 0); // any wrong Advanced answer would go below 0
     const next = applyAnswerToWorld(w, false, GATE_POINTS_A);
     expect(next.lives).toBe(MAX_LIVES - 1);
-    expect(next.scoreDelta).toBe(-GATE_POINTS_A);
-    expect(next.runState).toBe('game-over');
+    expect(next.runState).toBe('running');
+    // Total score after clamping must be exactly 0 (not negative).
+    const total = next.scoreDelta + 0; // tickMs is 0 in this stub, so tick-component is 0.
+    expect(total).toBe(0);
   });
 
   it('wrong answer at lives === 1 (score still non-negative): consumeLife transitions to game-over with 0 lives', () => {
@@ -124,10 +126,21 @@ describe('applyAnswerToWorld', () => {
     expect(next.runState).toBe('game-over');
   });
 
-  it('wrong answer at lives === 2 that ALSO drops score below zero: lives go to 1 (one life cost), game-over via score', () => {
+  it('wrong answer at lives === 1 that would also drop score below zero: zero-lives game-over takes precedence (no clamp needed)', () => {
+    const w = answeringWorld(1, 0);
+    const next = applyAnswerToWorld(w, false, GATE_POINTS_A);
+    expect(next.lives).toBe(0);
+    expect(next.runState).toBe('game-over');
+    // scoreDelta is left at -GATE_POINTS_A so the game-over screen shows
+    // the actual (negative) score — the player's "final score".
+    expect(next.scoreDelta).toBe(-GATE_POINTS_A);
+  });
+
+  it('wrong answer at lives === 2 that ALSO drops score below zero: -1 life (now 1), score clamped to 0, run continues', () => {
     const w = answeringWorld(2, 0);
     const next = applyAnswerToWorld(w, false, GATE_POINTS_A);
     expect(next.lives).toBe(1);
-    expect(next.runState).toBe('game-over');
+    expect(next.runState).toBe('running');
+    expect(next.scoreDelta + 0).toBe(0);
   });
 });

@@ -77,11 +77,16 @@ export interface GameLoopHostElements {
 }
 
 /**
- * Resolve a gate answer + apply the score-below-zero game-over rule.
- * A wrong answer always costs exactly one life (via `resolveAnswer`);
- * the score-below-zero check is a separate end-of-run signal that does
- * NOT consume an additional life. Pure function — extracted so the
- * rule is unit-testable.
+ * Resolve a gate answer + apply the score-floor rule.
+ *
+ * A wrong answer always costs exactly one life (via `resolveAnswer`).
+ * If that life-loss already transitioned to game-over (lives reached
+ * zero), return as-is. Otherwise, if the resulting score is below
+ * zero, clamp the score back to zero by bumping `scoreDelta` so the
+ * tick-derived score plus the new delta equals zero. The run
+ * continues; only zero-lives ends the game.
+ *
+ * Pure function — extracted so the rule is unit-testable.
  */
 export function applyAnswerToWorld(
   world: WorldState,
@@ -92,7 +97,8 @@ export function applyAnswerToWorld(
   if (next.runState === 'game-over') return next;
   const total = computeScore(next.tickMs, next.scoreDelta);
   if (total < 0) {
-    return { ...next, runState: 'game-over' };
+    // Clamp to exactly 0: new scoreDelta such that tickScore + delta = 0.
+    return { ...next, scoreDelta: next.scoreDelta - total };
   }
   return next;
 }
