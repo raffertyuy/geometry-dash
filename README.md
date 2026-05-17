@@ -1,6 +1,6 @@
 # The Real Geometry Dash
 
-A 3D, Tron-themed, Subway-Surfers-style endless runner where the obstacles are geometric shapes — eventually, geometry-question gates. Built as a static web app with TypeScript + Three.js + Vite.
+A 3D, Tron-themed, Subway-Surfers-style endless runner where the obstacle field is punctuated by **problem gates** — glowing Rubik's-cube collidables that pause the run and ask a multiple-choice question. Built as a static web app with TypeScript + Three.js + Vite.
 
 > [!IMPORTANT]
 > **This project is 100% vibe-coded.** Every spec, plan, task list, test, and line of code was generated through a conversation with [Claude](https://www.anthropic.com/claude) using the [GitHub Spec Kit](https://github.com/github/spec-kit) workflow. A human guided design decisions in plain English; the AI wrote everything. The `specs/NNN-*/` folders are deliberately preserved as a record of how each feature was specified and built — they're useful if you're studying spec-driven AI development end to end.
@@ -13,6 +13,7 @@ A 3D, Tron-themed, Subway-Surfers-style endless runner where the obstacles are g
 - **Random obstacles**: six 3D shape variants (cube, pillar, cylinder, icosahedron, trapezoid prism, wide bar) in three Tron colors (red, blue, green) with glowing edge outlines. Block one or two lanes; at least one lane is always passable.
 - **Game-over + restart**: hit an obstacle and the world freezes; an overlay shows your final score and time; tap or press any key to restart.
 - **Difficulty escalation**: every N seconds the run speed multiplies by a configurable factor and the score-per-100 ms increment grows by a configurable amount. Spec defaults are 30 s / +1 / 1.10×; three knobs in `src/shared/config.ts` (`ESCALATION_TIER_DURATION_MS`, `ESCALATION_SCORE_INCREMENT_PER_TIER`, `ESCALATION_SPEED_MULTIPLIER_PER_TIER`) let you retune without code changes. Currently set to an accelerated test config (10 s / +10 / 2.00×) so the progression is feel-able in a short session.
+- **Problem gates + lives**: glowing **Rubik's-cube** collidables in muted green / orange / red co-spawn with obstacles. Collision pauses the run and opens a modal with a placeholder geometry question + three answer choices (arrow keys / WASD + Enter, mouse click, or touch tap all commit). Correct = +1k / +5k / +10k with a green floating "+N"; wrong = the same magnitude in red AND one heart lost. The runner now starts each run with **3 lives** displayed as faceted heart icons; obstacle hits also cost a life and respawn the runner in the centre lane with a 3-second blinking invincibility window (which absorbs both obstacles and gates). Two game-over conditions: zero lives, or score drops below zero (a wrong A gate on a small-score run is enough). Placeholder problems only for now; real diagrams + equation typesetting come in a future slice.
 
 ## Getting started
 

@@ -1,6 +1,6 @@
 # The Real Geometry Dash
 
-A web-based endless runner in the spirit of Subway Surfers, where the obstacles are **geometry-question gates**. The player runs forward, swipes/keys between lanes, and must answer a multiple-choice geometry question (one of three options) to pass through a gate. Gate colour signals difficulty: green (basic), orange (intermediate), red (advanced). Score grows with distance travelled.
+A web-based endless runner in the spirit of Subway Surfers, where collidable **problem gates** punctuate the obstacle field. The player runs forward, swipes/keys between lanes, and may hit a glowing Rubik's-cube-style gate that pauses the run and asks a multiple-choice question (initially geometry placeholders; future slices will introduce real diagrams + equation typesetting). Gate colour signals difficulty: muted green = Basic, muted orange = Medium, muted red = Advanced. Correct answers earn ±1k/5k/10k points (B/M/A); wrong answers cost the same magnitude AND a life. The runner starts with 3 lives shown as faceted heart icons; obstacle hits also cost a life and respawn the runner with a 3-second blinking invincibility window. Two ways to lose: zero lives, or score drops below zero.
 
 ## Working in this repo
 
