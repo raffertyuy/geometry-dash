@@ -30,19 +30,31 @@ const COL_PLAYER_BODY = 0x110804;
 // Note: the trail's amber colour is decomposed into TRAIL_R/G/B below for
 // per-vertex fade in the Line2 vertex-colour buffer.
 const COL_SPEED_LINE = 0x8ad0ff;
-// Per-colour obstacle palette. Each entry has three parts:
-//   - body: the (darker, slightly emissive) face colour
-//   - bodyEmit: the colour the body's faces glow with at low intensity
-//   - edge: the bright line colour overlaid on the geometric edges
-// The Tron look comes from the edges; the body just adds a coloured wash.
+// Unified dark-blue obstacle palette. With problem cubes carrying the
+// scene's "bright" element (neon green / yellow / red), obstacles fade
+// into the floor's dark-Tron-blue family - readable mainly through their
+// glowing cyan edges. All three ObstacleColorVariant entries point at
+// the same values so the spawner's existing random-variant pick has no
+// visual effect; the type union is retained for backward compatibility
+// (and in case future slices want per-variant palettes back).
+//
+//   floor    = 0x041830
+//   obstacle = 0x031020 (slightly darker than floor)
+//   emissive = 0x183c70 (medium blue glow)
+//   edge     = 0x4ab8ff (bright cyan, distinct from grid)
+const OBSTACLE_PALETTE = {
+  base: 0x031020,
+  emissive: 0x183c70,
+  edge: 0x4ab8ff,
+} as const;
 const COL_OBSTACLES: Readonly<Record<ObstacleColorVariant, {
   base: number;
   emissive: number;
   edge: number;
 }>> = {
-  red:   { base: 0x2a0612, emissive: 0xb02238, edge: 0xff3a5e },
-  blue:  { base: 0x07154a, emissive: 0x2a55d8, edge: 0x4ab8ff },
-  green: { base: 0x062a0e, emissive: 0x2aa040, edge: 0x4fff8a },
+  red: OBSTACLE_PALETTE,
+  blue: OBSTACLE_PALETTE,
+  green: OBSTACLE_PALETTE,
 };
 
 // ---- Scene geometry ------------------------------------------------------

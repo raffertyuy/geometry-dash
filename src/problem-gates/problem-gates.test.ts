@@ -29,15 +29,17 @@ describe('GATE_CATALOGUE', () => {
     }
   });
 
-  it('every channel of every gate colour is ≤ 0xC0 (muted palette invariant)', () => {
+  it('every gate colour has at least one channel ≥ 0xEE (neon palette invariant)', () => {
+    // Inverts the original "muted palette" rule: cubes are now the bright
+    // visual element of the scene (obstacles are the dark-blue element).
+    // Each difficulty colour must have at least one near-saturated channel
+    // so it pops against the unified dark-blue obstacle field.
     for (const d of ['B', 'M', 'A'] as const) {
       const hex = GATE_CATALOGUE[d].colorHex.slice(1); // strip '#'
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
       const b = parseInt(hex.slice(4, 6), 16);
-      expect(r).toBeLessThanOrEqual(0xc0);
-      expect(g).toBeLessThanOrEqual(0xc0);
-      expect(b).toBeLessThanOrEqual(0xc0);
+      expect(Math.max(r, g, b)).toBeGreaterThanOrEqual(0xee);
     }
   });
 

@@ -18,10 +18,11 @@ import type {
 const ALL_LANES: readonly Lane[] = ['left', 'centre', 'right'];
 
 /**
- * Muted-palette catalogue keyed by gate difficulty. Hex values are
- * deliberately less saturated than the existing Tron-coloured obstacle
- * palette so the player reads gates as power-ups, not warnings. Every
- * channel sits at or below 0xC0 (192).
+ * Neon-palette catalogue keyed by gate difficulty. Each colour has at
+ * least one channel near full saturation so the cubes pop against the
+ * unified dark-blue obstacle field (see COL_OBSTACLES in three-renderer).
+ * Inverts the original muted-palette design: cubes are now the BRIGHT
+ * element of the scene, and obstacles fade into the floor.
  */
 export const GATE_CATALOGUE: Readonly<
   Record<
@@ -33,9 +34,9 @@ export const GATE_CATALOGUE: Readonly<
     }
   >
 > = {
-  B: { points: GATE_POINTS_B, colorHex: '#3da06a', label: 'Basic' },
-  M: { points: GATE_POINTS_M, colorHex: '#c08a3a', label: 'Medium' },
-  A: { points: GATE_POINTS_A, colorHex: '#a64141', label: 'Advanced' },
+  B: { points: GATE_POINTS_B, colorHex: '#44ff77', label: 'Basic' },
+  M: { points: GATE_POINTS_M, colorHex: '#ffe933', label: 'Medium' },
+  A: { points: GATE_POINTS_A, colorHex: '#ff4455', label: 'Advanced' },
 };
 
 export interface GateSpawnState {
