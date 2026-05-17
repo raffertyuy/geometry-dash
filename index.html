@@ -552,15 +552,85 @@
         grid-template-columns: 44px 1fr;
       }
 
-      #how-to-play-overlay .cube-swatch {
-        background-clip: padding-box;
-        border: 2px solid rgba(255, 255, 255, 0.55);
-        border-radius: 4px;
-        box-shadow: 0 0 10px currentColor;
-        display: block;
+      /* CSS-only 3D cube mimicking the in-game problem cube — tilted on
+         the X axis, continuously spinning on Y. Inline `--cube-color`
+         carries the per-difficulty colour. Four side faces show a "?";
+         top and bottom are blank. No glow / pulse per design intent. */
+      #how-to-play-overlay .cube-3d {
+        display: inline-block;
+        height: 44px;
+        margin-top: 0.05em;
+        perspective: 220px;
+        width: 44px;
+      }
+
+      #how-to-play-overlay .cube-3d__scene {
+        animation: htp-cube-spin 6s linear infinite;
         height: 36px;
-        margin-top: 0.15em;
+        left: 4px;
+        position: relative;
+        top: 4px;
+        transform-style: preserve-3d;
         width: 36px;
+      }
+
+      #how-to-play-overlay .cube-3d__face {
+        align-items: center;
+        background-color: var(--cube-color);
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        box-sizing: border-box;
+        display: flex;
+        height: 36px;
+        justify-content: center;
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 36px;
+      }
+
+      #how-to-play-overlay .cube-3d__face--front {
+        transform: translateZ(18px);
+      }
+      #how-to-play-overlay .cube-3d__face--back {
+        filter: brightness(0.7);
+        transform: rotateY(180deg) translateZ(18px);
+      }
+      #how-to-play-overlay .cube-3d__face--right {
+        filter: brightness(0.85);
+        transform: rotateY(90deg) translateZ(18px);
+      }
+      #how-to-play-overlay .cube-3d__face--left {
+        filter: brightness(0.85);
+        transform: rotateY(-90deg) translateZ(18px);
+      }
+      #how-to-play-overlay .cube-3d__face--top {
+        filter: brightness(1.1);
+        transform: rotateX(90deg) translateZ(18px);
+      }
+      #how-to-play-overlay .cube-3d__face--bottom {
+        filter: brightness(0.6);
+        transform: rotateX(-90deg) translateZ(18px);
+      }
+
+      #how-to-play-overlay .cube-3d__qmark {
+        color: rgba(0, 0, 0, 0.7);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 22px;
+        font-weight: 800;
+        line-height: 1;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+      }
+
+      @keyframes htp-cube-spin {
+        0%   { transform: rotateX(-22deg) rotateY(0deg); }
+        100% { transform: rotateX(-22deg) rotateY(360deg); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #how-to-play-overlay .cube-3d__scene {
+          animation: none;
+          transform: rotateX(-22deg) rotateY(-28deg);
+        }
       }
 
       #how-to-play-overlay .htp-cube-text {

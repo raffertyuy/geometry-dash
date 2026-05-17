@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { applyAnswerToWorld, derivePauseButtonState } from './game-loop';
-import { createWorldState, enterAnswering, startRun } from '../runner-engine';
+import { createWorldState } from '../runner-engine';
 import {
   GATE_POINTS_A,
   GATE_POINTS_B,
   INVINCIBILITY_DURATION_MS,
   MAX_LIVES,
+  RUN_SPEED_UNITS_PER_SEC,
 } from '../shared/config';
 import type { Problem, WorldState } from '../shared/types';
 
@@ -80,10 +81,16 @@ describe('applyAnswerToWorld — wrong-answer + score-below-zero is a single pen
   };
 
   function answeringWorld(initialLives: number, initialScoreDelta: number): WorldState {
-    return enterAnswering(
-      { ...startRun(createWorldState()), lives: initialLives, scoreDelta: initialScoreDelta },
-      STUB_PROBLEM,
-    );
+    return {
+      runState: 'answering',
+      speedUnitsPerSec: RUN_SPEED_UNITS_PER_SEC,
+      distanceUnits: 0,
+      tickMs: 0,
+      lives: initialLives,
+      invincibilityRemainingMs: 0,
+      scoreDelta: initialScoreDelta,
+      activeGate: { gateId: 1, difficulty: STUB_PROBLEM.difficulty, problem: STUB_PROBLEM },
+    };
   }
 
   it('correct answer: no life lost, score increases, run continues', () => {

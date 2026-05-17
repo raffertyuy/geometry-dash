@@ -192,35 +192,37 @@ describe('createHowToPlayModal: General Rules section content', () => {
 });
 
 describe('createHowToPlayModal: Problem Cubes section content', () => {
-  it('renders exactly three cube rows in B / M / A order with the GATE_CATALOGUE colour', () => {
+  it('renders exactly three cube rows in B / M / A order, each with a 3D cube carrying the GATE_CATALOGUE colour', () => {
     const modal = createHowToPlayModal(host, STUB_SOURCES);
     modal.show('entry');
     const rows = host.querySelectorAll('.htp-cube-row');
     expect(rows.length).toBe(3);
     const diffs = Array.from(rows).map((r) => r.getAttribute('data-difficulty'));
     expect(diffs).toEqual(['B', 'M', 'A']);
-    const swatches = host.querySelectorAll(
-      '.htp-cube-row .cube-swatch',
+    const cubes = host.querySelectorAll(
+      '.htp-cube-row .cube-3d',
     ) as NodeListOf<HTMLElement>;
-    expect(swatches.length).toBe(3);
-    // jsdom normalises hex to rgb(). Compute the expected rgb() string
-    // from the hex and compare. This both verifies the swatch carries
-    // a background colour AND that it's the GATE_CATALOGUE value.
-    function hexToRgb(hex: string): string {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgb(${r}, ${g}, ${b})`;
+    expect(cubes.length).toBe(3);
+    // Per-row 3D cube carries the per-difficulty colour as an inline
+    // --cube-color custom property; each cube has 6 faces and 4 of them
+    // carry the "?" glyph.
+    expect(cubes[0]!.style.getPropertyValue('--cube-color')).toBe(
+      GATE_CATALOGUE.B.colorHex,
+    );
+    expect(cubes[1]!.style.getPropertyValue('--cube-color')).toBe(
+      GATE_CATALOGUE.M.colorHex,
+    );
+    expect(cubes[2]!.style.getPropertyValue('--cube-color')).toBe(
+      GATE_CATALOGUE.A.colorHex,
+    );
+    for (const cube of Array.from(cubes)) {
+      expect(cube.querySelectorAll('.cube-3d__face').length).toBe(6);
+      const qmarks = cube.querySelectorAll('.cube-3d__qmark');
+      expect(qmarks.length).toBe(4);
+      for (const q of Array.from(qmarks)) {
+        expect(q.textContent).toBe('?');
+      }
     }
-    expect(swatches[0]!.style.backgroundColor).toBe(
-      hexToRgb(GATE_CATALOGUE.B.colorHex),
-    );
-    expect(swatches[1]!.style.backgroundColor).toBe(
-      hexToRgb(GATE_CATALOGUE.M.colorHex),
-    );
-    expect(swatches[2]!.style.backgroundColor).toBe(
-      hexToRgb(GATE_CATALOGUE.A.colorHex),
-    );
   });
 
   it('pairs each colour with a visible difficulty label (accessibility)', () => {

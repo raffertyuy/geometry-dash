@@ -99,6 +99,46 @@ export function createHowToPlayModal(
     bodyBuilt = true;
   }
 
+  /**
+   * Render a small CSS-only 3D cube that mimics the in-game problem cube:
+   * coloured faces with a "?" glyph, tilted on the X axis, continuously
+   * spinning on the Y axis. No JS frame loop — purely CSS transforms +
+   * keyframe animation. The four side faces carry the "?" so the symbol
+   * is visible at every rotation phase; top + bottom stay clean.
+   */
+  function buildCube3D(difficulty: GateDifficulty): HTMLElement {
+    const wrapper = doc.createElement('span');
+    wrapper.className = `cube-3d cube-3d--${difficulty.toLowerCase()}`;
+    wrapper.setAttribute('aria-hidden', 'true');
+    wrapper.style.setProperty(
+      '--cube-color',
+      GATE_CATALOGUE[difficulty].colorHex,
+    );
+    const scene = doc.createElement('span');
+    scene.className = 'cube-3d__scene';
+    const FACES: ReadonlyArray<{ readonly cls: string; readonly hasQ: boolean }> = [
+      { cls: 'front', hasQ: true },
+      { cls: 'back', hasQ: true },
+      { cls: 'right', hasQ: true },
+      { cls: 'left', hasQ: true },
+      { cls: 'top', hasQ: false },
+      { cls: 'bottom', hasQ: false },
+    ];
+    for (const { cls, hasQ } of FACES) {
+      const face = doc.createElement('span');
+      face.className = `cube-3d__face cube-3d__face--${cls}`;
+      if (hasQ) {
+        const q = doc.createElement('span');
+        q.className = 'cube-3d__qmark';
+        q.textContent = '?';
+        face.appendChild(q);
+      }
+      scene.appendChild(face);
+    }
+    wrapper.appendChild(scene);
+    return wrapper;
+  }
+
   function buildGeneralRules(): HTMLElement {
     const section = doc.createElement('section');
     section.className = 'htp-section htp-general-rules';
@@ -139,11 +179,7 @@ export function createHowToPlayModal(
       li.className = `htp-cube-row htp-cube-row--${row.difficulty.toLowerCase()}`;
       li.setAttribute('data-difficulty', row.difficulty);
 
-      const swatch = doc.createElement('span');
-      swatch.className = 'cube-swatch';
-      swatch.setAttribute('aria-hidden', 'true');
-      swatch.style.backgroundColor = GATE_CATALOGUE[row.difficulty].colorHex;
-      li.appendChild(swatch);
+      li.appendChild(buildCube3D(row.difficulty));
 
       const text = doc.createElement('div');
       text.className = 'htp-cube-text';
