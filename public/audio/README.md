@@ -2,28 +2,23 @@
 
 Two looping BGM tracks served as static assets.
 
-| File | Plays when | Style |
-|------|-----------|-------|
-| `bgm-default.opus` | Run is actively running, no problem-gate modal open | Calm tron-ambient |
-| `bgm-contest.opus` | Problem-gate modal is open | Tense math-contest / battle-of-the-brains |
+| File | Plays when | Source |
+|------|-----------|--------|
+| `bgm-default.opus` | Run is actively running, no problem-gate modal open | "Techno DRIVE!!!" by Centurion_of_war (CC BY 4.0) |
+| `bgm-contest.opus` | Problem-gate modal is open | "Tension" by Tsorthan Grove (CC BY 4.0) |
 
-## Status
+Both tracks are licensed under **Creative Commons Attribution 4.0 International** (CC BY 4.0) and are credited in the repo-root `LICENSES.md`.
 
-**Placeholders.** The current files are `ffmpeg`-generated synth loops committed so the audio engine has something to decode during development.
+## Encoding
 
-- `bgm-default.opus` — 24 s loop: 120-BPM bass kick + low-pass synth bass + a vibrato-modulated lead. Aims for a tron-racing techno feel.
-- `bgm-contest.opus` — 20 s loop: 4 Hz ticking percussion + a swung-arpeggio carrier + low pulse bass + a high vibrato lead. Aims for a futuristic quiz-show / "you're under pressure" feel.
+- Sourced from OpenGameArt.org.
+- Trimmed (default: 30 s, contest: 40 s) and re-encoded to mono Opus ~80 kbps to fit the project's per-file 500 KB BGM budget.
+- The contest source is labelled `tension_loop` by its author — the trimmed window may not loop perfectly seam-to-seam; if the loop boundary is audible enough to be distracting, re-encode a different segment or use the full 77-second loop at ~48 kbps.
 
-They are NOT the final tracks.
+## Replacing the tracks
 
-## Sourcing the real tracks
+The audio engine is content-agnostic — drop in any file at the same paths with a supported format (Opus, OGG Vorbis, MP3, AAC) and no code changes are needed. If you replace these tracks, update the attribution in `LICENSES.md` and this README accordingly.
 
-Per `specs/009-audio/research.md` §R2:
+## SFX
 
-- Must be CC0 OR CC-BY 4.0.
-- Each file ≤ 500 KB compressed (Opus or AAC).
-- Default = calm tron-arcade ambient; slow synth pad with gentle pulse.
-- Contest = quiz-show / brain-battle vibe; ticking percussion, brisk arpeggio. **Do not** copy a branded piece (e.g. Are You Smarter Than a 5th Grader / Battle of the Brains theme) — source a CC0 / CC-BY 4.0 alternative that *evokes* the genre.
-- If CC-BY 4.0, add the attribution to `LICENSES.md`.
-
-The engine's API is content-agnostic — replacing these files needs no code change.
+There are no SFX asset files. All seven sound effects (lane change, obstacle hit, gate hit, correct answer, life lost, game over, countdown tick) are synthesised procedurally at runtime by `src/audio/sfx-synth.ts`.
