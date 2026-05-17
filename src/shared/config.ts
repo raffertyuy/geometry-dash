@@ -56,7 +56,7 @@ export const ESCALATION_SPEED_MULTIPLIER_PER_TIER = 1.10;
 // Only obstacle collisions grant the post-respawn invincibility window
 // (per spec FR-010/FR-011). Wrong-answer life loss is instantaneous.
 export const MAX_LIVES = 3;
-export const INVINCIBILITY_DURATION_MS = 3_000;
+export const INVINCIBILITY_DURATION_MS = 1_500;
 
 // Problem-gate scoring. Each gate's reward magnitude doubles as its penalty
 // magnitude: correct answer = +N points; wrong answer = -N points AND -1 life.
