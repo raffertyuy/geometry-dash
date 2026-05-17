@@ -61,16 +61,16 @@ Constraints to keep in mind:
 - `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
-**Active feature**: `005-problem-gates` — Question-answer "problem gates" (B/M/A difficulty, glowing Rubik's-cube meshes in muted green/orange/red) co-spawn with obstacles; collision opens a modal with three answer choices; correct/wrong = ±1k/5k/10k points + (on wrong) −1 life. 3 lives per run (geometric heart icons in HUD); obstacle hits now cost a life + respawn in centre lane with 3 s blinking invincibility. Game-over on either 0 lives or score < 0. Placeholder problems for now.
+**Active feature**: `006-geometry-problems` — Replace the 15-per-difficulty placeholder problem pool from slice 005 with real geometry problems: ~100 hand-curated Basic problems sourced from OpenStax Contemporary Mathematics + Illustrative Mathematics (both CC BY 4.0); ~12-15 parameterised Medium templates and ~10-15 parameterised Advanced templates that compute the correct answer + plausible distractors algorithmically and emit a parameterised inline SVG diagram in the modal's reserved `.problem-figure` slot. Unicode-only equation rendering (no KaTeX — would break the 500 KB budget). CC-BY attribution via `LICENSES.md` at repo root + an in-app "Problem credits" panel reachable from start / game-over screens.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/005-problem-gates/plan.md` (technical context + constitution check + project tree)
-- `specs/005-problem-gates/spec.md` (user stories, requirements, success criteria)
-- `specs/005-problem-gates/research.md` (Phase 0 decisions for this slice)
-- `specs/005-problem-gates/data-model.md` (new entities, WorldState extensions, lifecycle with the new `'answering'` state)
-- `specs/005-problem-gates/contracts/module-contracts.md` (new `src/problem-gates/` + `src/problems/` modules + renderer DOM helpers + runner-engine transitions + `computeScore` parameter extension)
-- `specs/005-problem-gates/quickstart.md` (slice-specific validation steps)
+- `specs/006-geometry-problems/plan.md` (technical context + constitution check + project tree)
+- `specs/006-geometry-problems/spec.md` (user stories, requirements, success criteria)
+- `specs/006-geometry-problems/research.md` (Phase 0 decisions for this slice)
+- `specs/006-geometry-problems/data-model.md` (Problem extension + ProblemSource + Template shape + SVG archetype shape)
+- `specs/006-geometry-problems/contracts/module-contracts.md` (new `src/diagrams/` module + expanded `src/problems/` internals + new `credits-panel` renderer adapter + modal figure-injection extension)
+- `specs/006-geometry-problems/quickstart.md` (slice-specific validation steps)
 
-The foundational architecture is captured in `specs/001-lane-runner/`, `specs/002-scoring-hud/`, `specs/003-obstacles/`, and `specs/004-difficulty-escalation/`. This slice introduces the game's first **question-answer mechanic** and the **lives system** that makes the runner game survivable across more than one mistake.
+The foundational architecture is captured in `specs/001-lane-runner/` through `specs/005-problem-gates/`. This slice replaces placeholder content with real, attributed geometry problems and introduces the project's first **parameterised SVG diagram pipeline** + **CC-BY attribution surface**.
 <!-- SPECKIT END -->
