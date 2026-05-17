@@ -115,8 +115,12 @@ const GATE_TILT_Y = 0.62; // side turn (radians) - shows right face
 const GATE_BOB_AMPLITUDE = 0.10; // world units of vertical hover travel
 const GATE_BOB_PERIOD_MS = 1400;
 const GATE_SPIN_PERIOD_MS = 9000; // slow constant Y-spin for "alive" feel
-const GATE_TWINKLE_PERIOD_MS = 1200; // primary emissive pulse cycle
-const GATE_SHIMMER_PERIOD_MS = 200; // fast secondary shimmer overlay
+// Candle-flicker glow: three sine components at irrational period ratios
+// give a smooth wavering pulse that never repeats noticeably. Primary
+// period sets the overall cadence; the secondary periods are derived
+// from it in updateGates() (× 1.53 and × 1.91 — non-rational so the
+// combined waveform doesn't lock into a visible cycle).
+const GATE_CANDLE_PERIOD_MS = 2400;
 const GATE_HALO_SCALE = 2.6; // outer-glow halo size relative to cube
 const GATE_QMARK_SCALE = 1.05; // question-mark sprite size relative to cube
 
@@ -707,23 +711,26 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   }
 
   function updateGates(gates: readonly ProblemGate[], tickMs = 0): void {
-    // Sparkle: a slow base pulse + a fast sharp-peaked shimmer overlay
-    // gives the cube a "breathing + occasionally twinkling" feel rather
-    // than a monotonic sine throb. Time-base is world.tickMs so the
-    // pulse freezes during a modal-open ('answering') frame - the world
-    // is paused, the gate should look paused too.
-    const slowPhase =
-      (tickMs % GATE_TWINKLE_PERIOD_MS) / GATE_TWINKLE_PERIOD_MS;
-    const fastPhase =
-      (tickMs % GATE_SHIMMER_PERIOD_MS) / GATE_SHIMMER_PERIOD_MS;
-    const slowPulse = 0.5 * (1 + Math.sin(slowPhase * Math.PI * 2));
-    // Sharp peak: |sin|^8 stays near 0 most of the cycle, then spikes.
-    const shimmerPeak = Math.pow(
-      Math.abs(Math.sin(fastPhase * Math.PI)),
-      8,
-    );
-    const emissive = 0.7 + 0.7 * slowPulse + 0.4 * shimmerPeak;
-    const haloOpacity = 0.35 + 0.45 * slowPulse + 0.3 * shimmerPeak;
+    // Candle-flicker glow: three slow sine components at irrational period
+    // ratios sum to a smooth wavering pulse that dims and brightens
+    // continuously without locking into an obvious cycle. Feels like a
+    // hovering flame rather than a strobe. Time-base is world.tickMs so
+    // the flicker freezes during a modal-open ('answering') frame - the
+    // world is paused, the gate pauses with it.
+    const primaryPhase = (tickMs / GATE_CANDLE_PERIOD_MS) * Math.PI * 2;
+    const driftPhase =
+      (tickMs / (GATE_CANDLE_PERIOD_MS * 1.53)) * Math.PI * 2 + 1.1;
+    const deepPhase =
+      (tickMs / (GATE_CANDLE_PERIOD_MS * 1.91)) * Math.PI * 2 + 2.4;
+    const combined =
+      0.55 * Math.sin(primaryPhase) +
+      0.30 * Math.sin(driftPhase) +
+      0.15 * Math.sin(deepPhase);
+    // combined sits in roughly [-1, 1]; normalise to [0, 1] for mapping.
+    const intensity01 = 0.5 + 0.5 * combined;
+    // Wide ranges so the dim feels properly dim and the peak pops.
+    const emissive = 0.4 + 1.2 * intensity01; // [0.4, 1.6]
+    const haloOpacity = 0.2 + 0.7 * intensity01; // [0.2, 0.9]
 
     gateBodyMaterials.B.emissiveIntensity = emissive;
     gateBodyMaterials.M.emissiveIntensity = emissive;
