@@ -124,10 +124,19 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   }
 
   function triggerGameOver(): void {
+    // endRun is a no-op when world.runState is already 'game-over' (the
+    // typical case after consumeLife or the score-below-zero check
+    // transitioned us). The call stays for the legacy path where some
+    // future code might still rely on triggerGameOver to do the transition.
     world = endRun(world);
     loopState = 'game-over';
     isAwaitingRestart = true;
-    host.gameOverScore.textContent = formatScore(computeScore(world.tickMs));
+    // Display the TOTAL score (tick-derived + scoreDelta). For the score-
+    // below-zero game-over path this is negative; per spec FR-015 we show
+    // the actual value verbatim with the minus sign, no clamping.
+    host.gameOverScore.textContent = formatScore(
+      computeScore(world.tickMs, world.scoreDelta),
+    );
     host.gameOverTimer.textContent = formatTimer(world.tickMs);
     showGameOverOverlay(true);
   }

@@ -138,12 +138,12 @@ This slice inherits all setup from 001–004. No project-level setup work requir
 
 ### Tests for User Story 3
 
-- [ ] T041 [P] [US3] Extend `src/runner-engine/runner-engine.test.ts` with explicit score-below-zero cases: `resolveAnswer` wrong with `tickMs: 4000, scoreDelta: 0, lives: 3, points: 5000` returns `runState: 'game-over'` via the score-below-zero path (assert `computeScore(world.tickMs, world.scoreDelta) < 0`); `lives: 2` (still positive — verifies it was the score-below-zero condition that fired, not the lives-zero one); `score_went_negative` `console.debug` event fired. Compare with `resolveAnswer` wrong with `tickMs: 100_000, scoreDelta: 0, lives: 3, points: 1000` — does NOT end the run (total stays positive: 100_000-derived score ≫ 1000 penalty).
+- [X] T041 [P] [US3] Extend `src/runner-engine/runner-engine.test.ts` with explicit score-below-zero cases: `resolveAnswer` wrong with `tickMs: 4000, scoreDelta: 0, lives: 3, points: 5000` returns `runState: 'game-over'` via the score-below-zero path (assert `computeScore(world.tickMs, world.scoreDelta) < 0`); `lives: 2` (still positive — verifies it was the score-below-zero condition that fired, not the lives-zero one); `score_went_negative` `console.debug` event fired. Compare with `resolveAnswer` wrong with `tickMs: 100_000, scoreDelta: 0, lives: 3, points: 1000` — does NOT end the run (total stays positive: 100_000-derived score ≫ 1000 penalty).
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Update `triggerGameOver()` in `src/game/game-loop.ts` to use the two-arg `computeScore(world.tickMs, world.scoreDelta)` when populating `host.gameOverScore.textContent` so the negative number is rendered verbatim. If `formatScore` clamps or strips the minus sign, update `src/score/score.ts` `formatScore` to preserve it (`String(score)` does this naturally; verify no thousands-separator helper introduces clamping). **Blocked by**: T030, T037.
-- [ ] T043 [US3] Confirm T041 test green; full suite passes. Run `npm test`. **Blocked by**: T041, T042.
+- [X] T042 [US3] Update `triggerGameOver()` in `src/game/game-loop.ts` to use the two-arg `computeScore(world.tickMs, world.scoreDelta)` when populating `host.gameOverScore.textContent` so the negative number is rendered verbatim. If `formatScore` clamps or strips the minus sign, update `src/score/score.ts` `formatScore` to preserve it (`String(score)` does this naturally; verify no thousands-separator helper introduces clamping). **Blocked by**: T030, T037.
+- [X] T043 [US3] Confirm T041 test green; full suite passes. Run `npm test`. **Blocked by**: T041, T042.
 - [ ] T044 [US3] Manual desktop validation per [quickstart.md](./quickstart.md) §7: start fresh run; within first ~20 s hit an M gate and answer wrong; verify game-over overlay appears immediately even though hearts remain; verify final score reads a negative number (e.g., `"-4700"`).
 
 **Checkpoint**: Both game-over conditions verifiable and visually distinct. The two-ways-to-lose rule is fully wired and player-visible.
