@@ -25,6 +25,12 @@ const PROBLEM_A: Problem = {
 
 function makeHost(): HTMLDivElement {
   document.body.innerHTML = '';
+  // Reset persisted prefs so each test starts with auto-continue off.
+  try {
+    globalThis.localStorage?.clear();
+  } catch {
+    // jsdom may not always have localStorage; ignore.
+  }
   const host = document.createElement('div');
   host.classList.add('hidden');
   document.body.appendChild(host);

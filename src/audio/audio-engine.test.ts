@@ -124,7 +124,13 @@ async function flushPromises(): Promise<void> {
 }
 
 beforeEach(() => {
-  // Clean window listeners between tests.
+  // Clear persisted mute state so each test starts un-muted unless it
+  // explicitly opts in.
+  try {
+    globalThis.localStorage?.clear();
+  } catch {
+    // jsdom may not always have localStorage; ignore.
+  }
 });
 
 describe('createAudioEngine — mute toggle', () => {

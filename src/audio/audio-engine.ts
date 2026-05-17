@@ -4,7 +4,10 @@ import {
   AUDIO_SFX_ASSET_URLS,
   AUDIO_SFX_BASE_VOLUME,
 } from '../shared/config';
+import { loadBoolPref, saveBoolPref } from '../shared/persistence';
 import { playSfx, type SfxName } from './sfx-synth';
+
+const STORAGE_KEY_MUTE = 'mute';
 
 export type BgmTrack = 'default' | 'contest';
 
@@ -67,7 +70,7 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
   const sfxBuffers: Map<string, AudioBuffer> = new Map();
   let bgmSource: AudioBufferSourceNode | null = null;
   let activeTrack: BgmTrack | null = null;
-  let muted = false;
+  let muted = loadBoolPref(STORAGE_KEY_MUTE, false);
   let unlocked = false;
   let destroyed = false;
   let unavailable = false;
@@ -277,6 +280,7 @@ export function createAudioEngine(deps: AudioEngineDeps = {}): AudioEngine {
     if (muted === next) return;
     muted = next;
     applyMuteGain();
+    saveBoolPref(STORAGE_KEY_MUTE, next);
     console.debug({ event: 'audio_mute_toggled', muted });
   }
 

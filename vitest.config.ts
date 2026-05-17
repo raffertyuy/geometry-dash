@@ -8,6 +8,7 @@ export default defineConfig({
     environmentMatchGlobs: [
       ['src/phaser/**/*.test.ts', 'jsdom'],
       ['src/renderer/**/*.test.ts', 'jsdom'],
+      ['src/audio/**/*.test.ts', 'jsdom'],
     ],
   },
 });

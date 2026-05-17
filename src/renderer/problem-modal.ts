@@ -4,8 +4,11 @@ import {
   QUESTION_TIMER_MS_BY_DIFFICULTY,
   QUESTION_TIMER_URGENCY_MS,
 } from '../shared/config';
+import { loadBoolPref, saveBoolPref } from '../shared/persistence';
 import type { AnswerResult, Problem } from '../shared/types';
 import { mathText } from './math-text';
+
+const STORAGE_KEY_AUTO_CONTINUE = 'auto-continue';
 
 export interface ProblemModal {
   show(problem: Problem, onResolve: (result: AnswerResult) => void): void;
@@ -28,11 +31,10 @@ const COUNTDOWN_AUTO_MS = 1000;
 const COUNTDOWN_TICK_MS = 100;
 
 /**
- * Module-level auto-continue preference. Resets on page reload (no
- * localStorage — Constitution rule on offline-capable + no persistence
- * in this slice). Survives across modal opens within the same session.
+ * Module-level auto-continue preference. Persisted across reloads via
+ * localStorage; survives across modal opens within the same session.
  */
-let autoContinuePref = false;
+let autoContinuePref = loadBoolPref(STORAGE_KEY_AUTO_CONTINUE, false);
 
 /**
  * Problem-gate answer modal with a two-stage flow:
@@ -449,6 +451,7 @@ export function createProblemModal(
   function onAutoContinueChange(): void {
     if (!autoContinueCheckbox) return;
     autoContinuePref = autoContinueCheckbox.checked;
+    saveBoolPref(STORAGE_KEY_AUTO_CONTINUE, autoContinuePref);
     // If currently reviewing, retime the countdown to the new total.
     if (state === 'reviewing') {
       startCountdown();
