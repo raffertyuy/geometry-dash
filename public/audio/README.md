@@ -4,16 +4,17 @@ Two looping BGM tracks served as static assets.
 
 | File | Plays when | Source |
 |------|-----------|--------|
-| `bgm-default.opus` | Run is actively running, no problem-gate modal open | "Techno DRIVE!!!" by Centurion_of_war (CC BY 4.0) |
-| `bgm-contest.opus` | Problem-gate modal is open | "Tension" by Tsorthan Grove (CC BY 4.0) |
+| `bgm-default.opus` | Run is actively running, no problem-gate modal open | "Techno House (PSG version)" by Snabisch (CC BY 3.0) |
+| `bgm-contest.opus` | Problem-gate modal is open | "Battle Theme" by Wolfgang_ / Theodore Kerr (CC0) |
 
-Both tracks are licensed under **Creative Commons Attribution 4.0 International** (CC BY 4.0) and are credited in the repo-root `LICENSES.md`.
+Both tracks are credited in the repo-root `LICENSES.md`.
 
 ## Encoding
 
 - Sourced from OpenGameArt.org.
-- Trimmed (default: 30 s, contest: 40 s) and re-encoded to mono Opus ~80 kbps to fit the project's per-file 500 KB BGM budget.
-- The contest source is labelled `tension_loop` by its author — the trimmed window may not loop perfectly seam-to-seam; if the loop boundary is audible enough to be distracting, re-encode a different segment or use the full 77-second loop at ~48 kbps.
+- Default: full 59 s loop, re-encoded from MP3 to mono Opus ~56 kbps (CBR) — 419 KB.
+- Contest: trimmed to the first 45 s and re-encoded from MP3 to mono Opus ~80 kbps — 456 KB.
+- Both within the project's per-file 500 KB BGM budget; combined 875 KB (under the 1 MB combined BGM budget).
 
 ## Replacing the tracks
 

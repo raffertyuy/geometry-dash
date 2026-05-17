@@ -30,29 +30,33 @@ The game's two background-music tracks are sourced from OpenGameArt.org and
 used under their respective Creative Commons licences. The files live at
 `public/audio/bgm-default.opus` and `public/audio/bgm-contest.opus`.
 
-## bgm-default.opus — "Techno DRIVE!!!"
+## bgm-default.opus — "Techno House (PSG version)"
 
-- **Original title**: Techno DRIVE!!!
-- **Author**: Centurion_of_war
-- **Source URL**: https://opengameart.org/content/techno-drive
-- **Licence**: Creative Commons Attribution 4.0 International (CC BY 4.0),
-  https://creativecommons.org/licenses/by/4.0/
-- **Modification**: Trimmed to 30 seconds and re-encoded from OGG Vorbis to
-  mono Opus at ~80 kbps for size budget.
-- **Attribution**: "Techno DRIVE!!!" by Centurion_of_war
-  (https://opengameart.org/content/techno-drive), licensed under CC BY 4.0.
+- **Original title**: Techno House (PSG version)
+- **Author**: Snabisch
+- **Source URL**: https://opengameart.org/content/techno-house-psg-version
+- **Licence**: Creative Commons Attribution 3.0 (CC BY 3.0),
+  https://creativecommons.org/licenses/by/3.0/
+- **Modification**: Re-encoded from 128 kbps stereo MP3 to ~56 kbps mono
+  Opus for the project's per-file 500 KB BGM budget. Full 59 s loop
+  preserved.
+- **Attribution**: "Techno House (PSG version)" by Snabisch
+  (https://opengameart.org/content/techno-house-psg-version), licensed
+  under CC BY 3.0.
 
-## bgm-contest.opus — "Tension" (loop)
+## bgm-contest.opus — "Battle Theme"
 
-- **Original title**: Tension (tension_loop.flac)
-- **Author**: Tsorthan Grove
-- **Source URL**: https://opengameart.org/content/tension-0
-- **Licence**: Creative Commons Attribution 4.0 International (CC BY 4.0),
-  https://creativecommons.org/licenses/by/4.0/
-- **Modification**: Trimmed to 40 seconds and re-encoded from FLAC to mono
-  Opus at ~77 kbps for size budget.
-- **Attribution**: "Tension" by Tsorthan Grove
-  (https://opengameart.org/content/tension-0), licensed under CC BY 4.0.
+- **Original title**: Battle Theme
+- **Author**: Wolfgang_ (Theodore Kerr)
+- **Source URL**: https://opengameart.org/content/battle-theme-0
+- **Licence**: CC0 1.0 Universal (public domain dedication),
+  https://creativecommons.org/publicdomain/zero/1.0/
+- **Modification**: Trimmed to the first 45 seconds and re-encoded from
+  320 kbps stereo MP3 to ~80 kbps mono Opus for the project's per-file
+  500 KB BGM budget.
+- **Attribution**: Not required under CC0. Courtesy credit retained at
+  the author's request: "Battle Theme" by Wolfgang_ (Theodore Kerr),
+  https://opengameart.org/content/battle-theme-0.
 
 All sound effects (lane change, obstacle hit, gate hit, correct answer, life
 lost, game over, countdown tick) are synthesised procedurally at runtime by
