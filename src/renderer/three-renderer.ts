@@ -548,8 +548,10 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
   // power-up sparkle.
 
   // Procedural "?" canvas texture. Drawn once at boot, shared across all
-  // gates. White glyph with a dark outline so it reads against any cube
-  // colour; transparent background lets the cube body show through.
+  // gates. Classic Mario-Kart-block treatment: dark fill with a bright
+  // white halo. On bright cube bodies (neon yellow / green) the dark
+  // fill carries readability; on the red cube the white halo carries
+  // it. Works against all three neon colours.
   function makeQuestionMarkTexture(): THREE.CanvasTexture {
     const size = 256;
     const c = document.createElement('canvas');
@@ -562,13 +564,14 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
         'bold 200px ui-monospace, SFMono-Regular, "Courier New", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // Dark stroke first as a halo behind the white fill - keeps the "?"
-      // readable on bright bloomed faces.
-      ctx.strokeStyle = 'rgba(8, 12, 24, 0.85)';
-      ctx.lineWidth = 14;
+      // Bright outer halo. Slightly translucent so the bloom pipeline
+      // softens it into the glyph rather than a hard ring.
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.lineWidth = 20;
       ctx.lineJoin = 'round';
       ctx.strokeText('?', size / 2, size / 2 + 8);
-      ctx.fillStyle = '#ffffff';
+      // Dark fill - high contrast against all three neon cube colours.
+      ctx.fillStyle = '#08101e';
       ctx.fillText('?', size / 2, size / 2 + 8);
     }
     const tex = new THREE.CanvasTexture(c);
