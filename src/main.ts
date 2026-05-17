@@ -18,6 +18,7 @@ function bootstrap(): void {
   const howToPlayLinkGameOver = document.querySelector<HTMLElement>('#how-to-play-link-game-over');
   const pauseButton = document.querySelector<HTMLButtonElement>('#pause-button');
   const muteButton = document.querySelector<HTMLButtonElement>('#mute-button');
+  const resumeCountdown = document.querySelector<HTMLElement>('#resume-countdown');
 
   if (
     !canvas ||
@@ -36,7 +37,8 @@ function bootstrap(): void {
     !howToPlayLinkStart ||
     !howToPlayLinkGameOver ||
     !pauseButton ||
-    !muteButton
+    !muteButton ||
+    !resumeCountdown
   ) {
     console.error('Game bootstrap: required DOM elements not found', {
       canvas,
@@ -56,6 +58,7 @@ function bootstrap(): void {
       howToPlayLinkGameOver,
       pauseButton,
       muteButton,
+      resumeCountdown,
     });
     return;
   }
@@ -78,6 +81,7 @@ function bootstrap(): void {
     howToPlayLinkGameOver,
     pauseButton,
     muteButton,
+    resumeCountdown,
   });
 }
 

@@ -29,10 +29,11 @@ export const INPUT_COALESCE_WINDOW_MS = 50;
 // places the first obstacle ~1.4 s of running ahead of the player at the
 // current RUN_SPEED_UNITS_PER_SEC. MIN_GAP is the smallest acceptable gap
 // between successive groups; at the current run speed (24 u/s) and 200 ms
-// lane-switch duration, 14 world units is ~583 ms of running time, which
-// covers a full two-lane dodge (400 ms) plus ~183 ms of reaction time.
-export const OBSTACLES_MIN_GAP = 14;
-export const OBSTACLES_MAX_GAP = 28;
+// lane-switch duration, 50 world units is ~2.08 s of running time —
+// two-lane dodge (400 ms) + ~1.68 s of reaction/recovery time so the
+// obstacle field never feels crowded.
+export const OBSTACLES_MIN_GAP = 50;
+export const OBSTACLES_MAX_GAP = 64;
 export const OBSTACLES_INITIAL_SPAWN_Z = -34;
 export const OBSTACLES_SINGLE_LANE_PROBABILITY = 0.8;
 
