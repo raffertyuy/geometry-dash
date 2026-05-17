@@ -210,13 +210,11 @@
         line-height: 1.4;
       }
 
-      /* Reserved slot for future geometry diagrams (SVG primitives or a
-         pre-rendered figure). Currently empty - shown when populated.
-         Sized to comfortably hold ~280 px wide diagrams alongside the
-         question text without overflowing the modal panel. */
+      /* Diagram slot. Filled by the modal renderer with an inline SVG
+         when problem.figure is set; hidden via CSS :empty otherwise. */
       #problem-modal .problem-figure {
-        max-width: min(94vw, 720px);
-        max-height: 40vh;
+        max-width: min(94vw, 480px);
+        max-height: 30vh;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -225,6 +223,13 @@
 
       #problem-modal .problem-figure:empty {
         display: none;
+      }
+
+      #problem-modal .problem-figure svg {
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        width: auto;
       }
 
       #problem-modal .answer-choices {
@@ -267,6 +272,114 @@
         border-color: #18c8ff;
         background: rgba(24, 200, 255, 0.18);
         box-shadow: 0 0 12px rgba(24, 200, 255, 0.45);
+      }
+
+      /* Review-state styling: green correct / red incorrect feedback.
+         Backdrop tints the .overlay's existing dark backdrop with a
+         coloured wash. Answer choices get coloured outlines: the correct
+         answer in green, the wrong pick in red. */
+      #problem-modal.is-correct {
+        background: rgba(34, 204, 136, 0.32);
+      }
+
+      #problem-modal.is-incorrect {
+        background: rgba(255, 90, 90, 0.32);
+      }
+
+      #problem-modal.is-reviewing .answer-choice.is-correct-answer {
+        border-color: #22cc88;
+        background: rgba(34, 204, 136, 0.25);
+        box-shadow: 0 0 18px rgba(34, 204, 136, 0.65);
+      }
+
+      #problem-modal.is-reviewing .answer-choice.is-wrong-pick {
+        border-color: #ff5a5a;
+        background: rgba(255, 90, 90, 0.25);
+        box-shadow: 0 0 18px rgba(255, 90, 90, 0.65);
+      }
+
+      /* During reviewing, answer choices stop responding to hover and
+         can't be re-picked. */
+      #problem-modal.is-reviewing .answer-choice {
+        cursor: default;
+        pointer-events: none;
+      }
+
+      /* Review controls: visible in reviewing state only. */
+      #problem-modal .review-controls {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        width: min(86vw, 480px);
+        margin-top: 4px;
+        pointer-events: auto;
+      }
+
+      #problem-modal.is-reviewing .review-controls {
+        display: flex;
+      }
+
+      #problem-modal .review-feedback {
+        font-size: clamp(1.4rem, 4vw, 2rem);
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        text-shadow: 0 0 12px currentColor;
+      }
+
+      #problem-modal.is-correct .review-feedback {
+        color: #22cc88;
+      }
+
+      #problem-modal.is-incorrect .review-feedback {
+        color: #ff5a5a;
+      }
+
+      #problem-modal .continue-button {
+        font-family: inherit;
+        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        padding: 12px 32px;
+        min-height: 48px;
+        background: rgba(24, 200, 255, 0.22);
+        color: #e8e8ef;
+        border: 1.5px solid #18c8ff;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 0 12px rgba(24, 200, 255, 0.4);
+        transition: background 120ms ease-out, box-shadow 120ms ease-out;
+      }
+
+      #problem-modal .continue-button:hover,
+      #problem-modal .continue-button:focus {
+        background: rgba(24, 200, 255, 0.4);
+        box-shadow: 0 0 18px rgba(24, 200, 255, 0.65);
+      }
+
+      #problem-modal .auto-continue-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: clamp(0.85rem, 1.8vw, 1rem);
+        color: #c0c0d0;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      #problem-modal .auto-continue-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: #18c8ff;
+        cursor: pointer;
+      }
+
+      #problem-modal .countdown-display {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(0.85rem, 1.8vw, 1rem);
+        color: #9090a0;
+        letter-spacing: 0.04em;
       }
 
       /* Floating "+1000" / "-5000" badges that drift up from the score

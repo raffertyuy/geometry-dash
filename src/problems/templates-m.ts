@@ -1,4 +1,16 @@
 import {
+  circleFigure,
+  cubeSilhouette,
+  equilateralTriangleFigure,
+  rectangleFigure,
+  rectangularPrismSilhouette,
+  regularPolygonFigure,
+  rightTriangle,
+  squareFigure,
+  trapezoid,
+  triangleBaseHeight,
+} from '../diagrams';
+import {
   buildProblem,
   hasDuplicateChoices,
   mulberry32,
@@ -63,7 +75,6 @@ const T_PYTHAGORAS: Template = {
     const d1 = String(triple.a + triple.b);
     const d2 = String(Math.abs(triple.b - triple.a) + 1);
     if (hasDuplicateChoices(correct, d1, d2)) {
-      // Re-pick by stepping the seed once and recursing.
       return T_PYTHAGORAS.generate(r1.nextSeed);
     }
     return buildProblem(
@@ -74,6 +85,7 @@ const T_PYTHAGORAS: Template = {
       d1,
       d2,
       r1.nextSeed,
+      rightTriangle({ legA: triple.a, legB: triple.b, labelHyp: '?' }),
     );
   },
 };
@@ -89,9 +101,10 @@ const T_SQUARE_PERIMETER: Template = {
       'M',
       `Square with side ${s}. Perimeter?`,
       String(4 * s),
-      String(2 * s), // forgot two sides
-      String(s * s), // gave area instead
+      String(2 * s),
+      String(s * s),
       r1.nextSeed,
+      squareFigure(s),
     );
   },
 };
@@ -107,9 +120,10 @@ const T_SQUARE_AREA: Template = {
       'M',
       `Square with side ${s}. Area?`,
       String(s * s),
-      String(4 * s), // gave perimeter
-      String(2 * s), // doubled the side
+      String(4 * s),
+      String(2 * s),
       r1.nextSeed,
+      squareFigure(s),
     );
   },
 };
@@ -149,9 +163,10 @@ const T_RECTANGLE_PERIMETER: Template = {
       'M',
       `Rectangle with width ${w} and height ${h}. Perimeter?`,
       String(2 * (w + h)),
-      String(w * h), // gave area
-      String(w + h), // forgot the doubling
+      String(w * h),
+      String(w + h),
       nextSeed,
+      rectangleFigure(w, h),
     );
   },
 };
@@ -166,9 +181,10 @@ const T_RECTANGLE_AREA: Template = {
       'M',
       `Rectangle with width ${w} and height ${h}. Area?`,
       String(w * h),
-      String(2 * (w + h)), // gave perimeter
-      String(w + h), // gave half-perimeter
+      String(2 * (w + h)),
+      String(w + h),
       nextSeed,
+      rectangleFigure(w, h),
     );
   },
 };
@@ -191,6 +207,7 @@ const T_TRIANGLE_AREA_BASE_HEIGHT: Template = {
       String(p.b * p.h),
       String(p.b + p.h),
       r1.nextSeed,
+      triangleBaseHeight(p.b, p.h),
     );
   },
 };
@@ -207,9 +224,10 @@ const T_CIRCLE_AREA: Template = {
       'M',
       `Circle with radius ${r}. Area? (π ≈ 3.14)`,
       fmt(area),
-      fmt(2 * PI_APPROX * r), // circumference (common confusion)
-      fmt(PI_APPROX * r), // forgot the square
+      fmt(2 * PI_APPROX * r),
+      fmt(PI_APPROX * r),
       r1.nextSeed,
+      circleFigure(r, `r = ${r}`),
     );
   },
 };
@@ -226,9 +244,10 @@ const T_CIRCLE_CIRCUMFERENCE: Template = {
       'M',
       `Circle with radius ${r}. Circumference? (π ≈ 3.14)`,
       fmt(c),
-      fmt(PI_APPROX * r * r), // area (common confusion)
-      fmt(PI_APPROX * r), // forgot the 2
+      fmt(PI_APPROX * r * r),
+      fmt(PI_APPROX * r),
       r1.nextSeed,
+      circleFigure(r, `r = ${r}`),
     );
   },
 };
@@ -247,6 +266,7 @@ const T_POLYGON_ANGLE_SUM: Template = {
       `${n * 180}°`,
       `${(n - 2) * 90}°`,
       r1.nextSeed,
+      regularPolygonFigure(n, `${n} sides`),
     );
   },
 };
@@ -262,9 +282,10 @@ const T_CUBE_VOLUME: Template = {
       'M',
       `Cube with side ${s}. Volume?`,
       String(s * s * s),
-      String(6 * s * s), // gave surface area
-      String(s * s), // forgot to cube
+      String(6 * s * s),
+      String(s * s),
       r1.nextSeed,
+      cubeSilhouette(s),
     );
   },
 };
@@ -280,9 +301,10 @@ const T_CUBE_SURFACE_AREA: Template = {
       'M',
       `Cube with side ${s}. Surface area?`,
       String(6 * s * s),
-      String(s * s * s), // gave volume
-      String(4 * s * s), // forgot two faces
+      String(s * s * s),
+      String(4 * s * s),
       r1.nextSeed,
+      cubeSilhouette(s),
     );
   },
 };
@@ -298,9 +320,10 @@ const T_TRAPEZOID_AREA: Template = {
       'M',
       `Trapezoid with parallel sides ${t.a} and ${t.b}, height ${t.h}. Area?`,
       String(t.area),
-      String((t.a + t.b) * t.h), // forgot to halve
-      String(t.a * t.b), // multiplied parallel sides
+      String((t.a + t.b) * t.h),
+      String(t.a * t.b),
       r1.nextSeed,
+      trapezoid({ topSide: t.a, bottomSide: t.b, height: t.h, showAltitude: true }),
     );
   },
 };
@@ -316,9 +339,10 @@ const T_EQUILATERAL_PERIMETER: Template = {
       'M',
       `Equilateral triangle with side ${s}. Perimeter?`,
       String(3 * s),
-      String(2 * s), // counted only 2 sides
-      String(s * s), // confused with area-ish
+      String(2 * s),
+      String(s * s),
       r1.nextSeed,
+      equilateralTriangleFigure(s),
     );
   },
 };
@@ -337,6 +361,7 @@ const T_ISOSCELES_RIGHT_HYPOTENUSE: Template = {
       `${2 * leg}`,
       `${leg}√3`,
       r1.nextSeed,
+      rightTriangle({ legA: leg, legB: leg, labelHyp: '?' }),
     );
   },
 };
@@ -357,9 +382,10 @@ const T_RECT_PRISM_VOLUME: Template = {
       'M',
       `Rectangular prism ${c.l} × ${c.w} × ${c.h}. Volume?`,
       String(c.l * c.w * c.h),
-      String(2 * (c.l * c.w + c.l * c.h + c.w * c.h)), // surface area
-      String(c.l + c.w + c.h), // edge-sum
+      String(2 * (c.l * c.w + c.l * c.h + c.w * c.h)),
+      String(c.l + c.w + c.h),
       r1.nextSeed,
+      rectangularPrismSilhouette(c.l, c.w, c.h),
     );
   },
 };

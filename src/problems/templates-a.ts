@@ -1,4 +1,15 @@
 import {
+  compositeRectangleTriangle,
+  coneSilhouette,
+  coordinatePlane,
+  cylinderSilhouette,
+  pyramidSilhouette,
+  rectangularPrismSilhouette,
+  rightTriangle,
+  sphereSilhouette,
+  triangleGeneric,
+} from '../diagrams';
+import {
   buildProblem,
   mulberry32,
   pickOne,
@@ -27,9 +38,10 @@ const T_SPHERE_VOLUME: Template = {
       'A',
       `Sphere with radius ${r}. Volume? (π ≈ 3.14)`,
       fmt(v),
-      fmt(4 * PI_APPROX * r * r), // surface area
-      fmt((4 / 3) * r * r * r), // forgot the π
+      fmt(4 * PI_APPROX * r * r),
+      fmt((4 / 3) * r * r * r),
       r1.nextSeed,
+      sphereSilhouette(r),
     );
   },
 };
@@ -47,9 +59,10 @@ const T_SPHERE_SURFACE: Template = {
       'A',
       `Sphere with radius ${r}. Surface area? (π ≈ 3.14)`,
       fmt(sa),
-      fmt((4 / 3) * PI_APPROX * r * r * r), // volume
-      fmt(2 * PI_APPROX * r * r), // half-sphere SA
+      fmt((4 / 3) * PI_APPROX * r * r * r),
+      fmt(2 * PI_APPROX * r * r),
       r1.nextSeed,
+      sphereSilhouette(r),
     );
   },
 };
@@ -69,9 +82,10 @@ const T_CYLINDER_VOLUME: Template = {
       'A',
       `Cylinder with radius ${r}, height ${h}. Volume? (π ≈ 3.14)`,
       fmt(v),
-      fmt(2 * PI_APPROX * r * h), // lateral surface
-      fmt(PI_APPROX * r * h), // missing the square
+      fmt(2 * PI_APPROX * r * h),
+      fmt(PI_APPROX * r * h),
       r2.nextSeed,
+      cylinderSilhouette(r, h),
     );
   },
 };
@@ -99,9 +113,10 @@ const T_CYLINDER_SURFACE: Template = {
         'A',
         `Cylinder with radius ${r}, height ${h}. Surface area? (π ≈ 3.14)`,
         fmt(sa),
-        fmt(PI_APPROX * r * r * h), // volume
-        fmt(2 * PI_APPROX * r * h), // forgot the end caps
+        fmt(PI_APPROX * r * r * h),
+        fmt(2 * PI_APPROX * r * h),
         r2.nextSeed,
+        cylinderSilhouette(r, h),
       );
     }
     throw new Error('T_CYLINDER_SURFACE: 16 retries exhausted');
@@ -122,9 +137,10 @@ const T_CONE_VOLUME: Template = {
       'A',
       `Cone with radius ${r}, height ${h}. Volume? (π ≈ 3.14)`,
       fmt(v),
-      fmt(PI_APPROX * r * r * h), // cylinder volume (forgot 1/3)
-      fmt((1 / 3) * PI_APPROX * r * h), // missing the square
+      fmt(PI_APPROX * r * r * h),
+      fmt((1 / 3) * PI_APPROX * r * h),
       r2.nextSeed,
+      coneSilhouette(r, h),
     );
   },
 };
@@ -144,9 +160,10 @@ const T_PYRAMID_VOLUME: Template = {
       'A',
       `Square-based pyramid with base side ${a}, height ${h}. Volume?`,
       fmt(v),
-      fmt(a * a * h), // forgot the 1/3
-      fmt(a * h), // forgot to square
+      fmt(a * a * h),
+      fmt(a * h),
       r2.nextSeed,
+      pyramidSilhouette(a, h),
     );
   },
 };
@@ -174,9 +191,10 @@ const T_HERON_AREA: Template = {
       'A',
       `Triangle with sides ${c.a}, ${c.b}, ${c.c}. Area? (Heron's formula)`,
       fmt(c.area),
-      String((c.a + c.b + c.c) / 2), // semi-perimeter (common confusion)
-      String(c.a + c.b + c.c), // perimeter
+      String((c.a + c.b + c.c) / 2),
+      String(c.a + c.b + c.c),
       r1.nextSeed,
+      triangleGeneric({ a: c.a, b: c.b, c: c.c }),
     );
   },
 };
@@ -205,9 +223,16 @@ const T_DISTANCE_FORMULA: Template = {
       'A',
       `Distance between (${c.x1}, ${c.y1}) and (${c.x2}, ${c.y2})?`,
       String(c.d),
-      String(dx + dy), // Manhattan distance (common error)
+      String(dx + dy),
       String(Math.max(dx, dy)),
       r1.nextSeed,
+      coordinatePlane({
+        points: [
+          { x: c.x1, y: c.y1, label: `(${c.x1}, ${c.y1})` },
+          { x: c.x2, y: c.y2, label: `(${c.x2}, ${c.y2})` },
+        ],
+        drawLineBetweenFirstTwo: true,
+      }),
     );
   },
 };
@@ -235,9 +260,16 @@ const T_MIDPOINT_FORMULA: Template = {
       'A',
       `Midpoint of (${c.x1}, ${c.y1}) and (${c.x2}, ${c.y2})?`,
       `(${mx}, ${my})`,
-      `(${c.x1 + c.x2}, ${c.y1 + c.y2})`, // forgot to halve
-      `(${c.x1}, ${c.y2})`, // swapped-coordinate error
+      `(${c.x1 + c.x2}, ${c.y1 + c.y2})`,
+      `(${c.x1}, ${c.y2})`,
       r1.nextSeed,
+      coordinatePlane({
+        points: [
+          { x: c.x1, y: c.y1, label: `(${c.x1}, ${c.y1})` },
+          { x: c.x2, y: c.y2, label: `(${c.x2}, ${c.y2})` },
+        ],
+        drawLineBetweenFirstTwo: true,
+      }),
     );
   },
 };
@@ -262,9 +294,16 @@ const T_SLOPE_FORMULA: Template = {
       'A',
       `Slope of the line through (${c.x1}, ${c.y1}) and (${c.x2}, ${c.y2})?`,
       String(c.m),
-      String(-c.m), // negation - sign error
-      String(c.m + 1), // off-by-one arithmetic error
+      String(-c.m),
+      String(c.m + 1),
       r1.nextSeed,
+      coordinatePlane({
+        points: [
+          { x: c.x1, y: c.y1, label: `(${c.x1}, ${c.y1})` },
+          { x: c.x2, y: c.y2, label: `(${c.x2}, ${c.y2})` },
+        ],
+        drawLineBetweenFirstTwo: true,
+      }),
     );
   },
 };
@@ -290,9 +329,10 @@ const T_RECT_PRISM_SA: Template = {
       'A',
       `Rectangular prism ${c.l} × ${c.w} × ${c.h}. Surface area?`,
       String(sa),
-      String(c.l * c.w * c.h), // volume
-      String(c.l * c.w + c.l * c.h + c.w * c.h), // forgot the 2
+      String(c.l * c.w * c.h),
+      String(c.l * c.w + c.l * c.h + c.w * c.h),
       r1.nextSeed,
+      rectangularPrismSilhouette(c.l, c.w, c.h),
     );
   },
 };
@@ -313,6 +353,7 @@ const T_30_60_90: Template = {
       String(hyp / 3),
       `${short}√3`,
       r1.nextSeed,
+      rightTriangle({ legA: hyp, legB: hyp * 0.577, labelA: `${hyp}`, labelB: '60°', labelHyp: '30°' }),
     );
   },
 };
@@ -332,6 +373,7 @@ const T_45_45_90: Template = {
       `${2 * leg}`,
       `${leg}√3`,
       r1.nextSeed,
+      rightTriangle({ legA: leg, legB: leg, labelHyp: '?' }),
     );
   },
 };
@@ -355,9 +397,10 @@ const T_COMPOSITE_RECT_TRIANGLE: Template = {
       'A',
       `A "house" shape: a ${c.w} × ${c.h} rectangle with a triangle of equal base on top, triangle height ${c.t}. Total area?`,
       String(c.area),
-      String(c.w * c.h + c.w * c.t), // forgot the /2 on triangle
-      String(c.w * c.h), // forgot the triangle
+      String(c.w * c.h + c.w * c.t),
+      String(c.w * c.h),
       r1.nextSeed,
+      compositeRectangleTriangle(c.w, c.h, c.t),
     );
   },
 };

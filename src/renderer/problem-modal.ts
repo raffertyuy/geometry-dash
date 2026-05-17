@@ -2,65 +2,81 @@ import { GATE_CATALOGUE } from '../problem-gates';
 import type { Problem } from '../shared/types';
 
 export interface ProblemModal {
-  show(problem: Problem, onCommit: (choiceIndex: 0 | 1 | 2) => void): void;
+  show(problem: Problem, onResolve: (choiceIndex: 0 | 1 | 2) => void): void;
   hide(): void;
   destroy(): void;
 }
 
-const KEY_NAVIGATE_PREV = new Set([
-  'ArrowLeft',
-  'ArrowUp',
-  'a',
-  'A',
-  'w',
-  'W',
-]);
-const KEY_NAVIGATE_NEXT = new Set([
-  'ArrowRight',
-  'ArrowDown',
-  'd',
-  'D',
-  's',
-  'S',
-]);
+const KEY_NAV_PREV = new Set(['ArrowLeft', 'ArrowUp', 'a', 'A', 'w', 'W']);
+const KEY_NAV_NEXT = new Set(['ArrowRight', 'ArrowDown', 'd', 'D', 's', 'S']);
 const KEY_COMMIT = new Set(['Enter', ' ']);
 
+const COUNTDOWN_DEFAULT_MS = 3000;
+const COUNTDOWN_AUTO_MS = 1000;
+const COUNTDOWN_TICK_MS = 100;
+
 /**
- * DOM adapter for the problem-gate answer modal. Mirrors the factory-
- * adapter shape used by createDebugOverlay / createLivesHud / etc.
+ * Module-level auto-continue preference. Resets on page reload (no
+ * localStorage — Constitution rule on offline-capable + no persistence
+ * in this slice). Survives across modal opens within the same session.
+ */
+let autoContinuePref = false;
+
+/**
+ * Problem-gate answer modal with a two-stage flow:
  *
- * On show(): populates the host with problem text + three answer
- * choices, removes the .hidden class, registers keyboard / click /
- * touch listeners scoped to the modal-open period. Highlights the
- * first choice by default; arrow keys / WASD navigate; Enter (or
- * Space) commits the highlighted choice. Mouse click and touch tap
- * on a choice commit that choice immediately.
+ *   1. CHOOSING — player navigates with keyboard / picks via click /
+ *      tap. The world stays in 'answering' (frozen). On commit, the
+ *      modal transitions to REVIEWING without yet calling back to the
+ *      game-loop.
  *
- * On commit: invokes onCommit(choiceIndex), then unregisters all
- * listeners but does NOT auto-hide — the game-loop calls hide() after
- * resolveAnswer + the floating-score animation, so the dismiss timing
- * stays in the game-loop's control.
+ *   2. REVIEWING — modal panel turns green (correct) or red (incorrect);
+ *      the correct answer is highlighted; if the player picked wrong,
+ *      their pick is marked. A countdown ticks down (3 s default, 1 s
+ *      with auto-continue on); a "Continue" button skips. Auto-continue
+ *      toggle persists in-memory across modal opens. When the countdown
+ *      hits zero or the player clicks Continue, the modal calls
+ *      onResolve(choiceIndex) and the game-loop completes the answer
+ *      (score / lives update + world transitions back to running).
+ *
+ * The world stays in 'answering' the entire time — runner-engine's
+ * tickWorld early-returns for 'answering' so the run is properly
+ * paused throughout the review window. This means no runner-engine
+ * refactor is needed; the modal absorbs the review delay.
  */
 export function createProblemModal(host: HTMLElement): ProblemModal {
   const doc = host.ownerDocument;
   const win = doc.defaultView ?? window;
 
-  let active = false;
+  type State = 'closed' | 'choosing' | 'reviewing';
+  let state: State = 'closed';
   let highlight: 0 | 1 | 2 = 0;
-  let committed = false;
-  let onCommitCallback: ((choiceIndex: 0 | 1 | 2) => void) | null = null;
+  let pickedIndex: 0 | 1 | 2 | null = null;
+  let currentProblem: Problem | null = null;
+  let onResolveCb: ((choiceIndex: 0 | 1 | 2) => void) | null = null;
+  let countdownIntervalId: ReturnType<typeof setInterval> | null = null;
+  let countdownRemainingMs = 0;
   let choiceElements: HTMLElement[] = [];
+  let continueButton: HTMLButtonElement | null = null;
+  let autoContinueCheckbox: HTMLInputElement | null = null;
+  let countdownDisplay: HTMLElement | null = null;
+
+  function clearTimers(): void {
+    if (countdownIntervalId !== null) {
+      clearInterval(countdownIntervalId);
+      countdownIntervalId = null;
+    }
+  }
 
   function buildBody(problem: Problem): void {
     host.innerHTML = '';
+    host.classList.remove('is-choosing', 'is-reviewing', 'is-correct', 'is-incorrect');
+
     const difficultyBadge = doc.createElement('div');
+    const dInfo = GATE_CATALOGUE[problem.difficulty];
     difficultyBadge.className = `problem-difficulty problem-difficulty--${problem.difficulty.toLowerCase()}`;
-    difficultyBadge.style.color = GATE_CATALOGUE[problem.difficulty].colorHex;
-    difficultyBadge.textContent = `${GATE_CATALOGUE[problem.difficulty].label} · ${
-      GATE_CATALOGUE[problem.difficulty].points >= 0
-        ? `±${GATE_CATALOGUE[problem.difficulty].points}`
-        : `${GATE_CATALOGUE[problem.difficulty].points}`
-    } pts`;
+    difficultyBadge.style.color = dInfo.colorHex;
+    difficultyBadge.textContent = `${dInfo.label} · ±${dInfo.points} pts`;
     host.appendChild(difficultyBadge);
 
     const prompt = doc.createElement('div');
@@ -68,12 +84,12 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     prompt.textContent = problem.prompt;
     host.appendChild(prompt);
 
-    // Reserved slot for a geometry diagram. Left empty for the current
-    // placeholder-problem pool; future slices that add real problems with
-    // SVG figures will populate this element. CSS hides it via :empty so
-    // text-only problems don't get a stray box.
+    // Figure slot. Empty when problem has no figure; CSS `:empty` hides it.
     const figure = doc.createElement('div');
     figure.className = 'problem-figure';
+    if (problem.figure) {
+      figure.innerHTML = problem.figure;
+    }
     host.appendChild(figure);
 
     const list = doc.createElement('ul');
@@ -85,18 +101,50 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
       li.setAttribute('data-idx', String(i));
       li.setAttribute('role', 'button');
       li.setAttribute('tabindex', '0');
-      const label = doc.createElement('span');
-      label.className = 'answer-letter';
-      label.textContent = ['A', 'B', 'C'][i]!;
+      const letter = doc.createElement('span');
+      letter.className = 'answer-letter';
+      letter.textContent = ['A', 'B', 'C'][i]!;
       const text = doc.createElement('span');
       text.className = 'answer-text';
       text.textContent = problem.choices[i]!.text;
-      li.appendChild(label);
+      li.appendChild(letter);
       li.appendChild(text);
       list.appendChild(li);
       choiceElements.push(li);
     }
     host.appendChild(list);
+
+    // Review controls panel — hidden during choosing, visible during reviewing.
+    const reviewControls = doc.createElement('div');
+    reviewControls.className = 'review-controls';
+
+    const feedback = doc.createElement('div');
+    feedback.className = 'review-feedback';
+    reviewControls.appendChild(feedback);
+
+    continueButton = doc.createElement('button');
+    continueButton.className = 'continue-button';
+    continueButton.type = 'button';
+    continueButton.textContent = 'Continue';
+    reviewControls.appendChild(continueButton);
+
+    const autoLabel = doc.createElement('label');
+    autoLabel.className = 'auto-continue-label';
+    autoContinueCheckbox = doc.createElement('input');
+    autoContinueCheckbox.type = 'checkbox';
+    autoContinueCheckbox.className = 'auto-continue-checkbox';
+    autoContinueCheckbox.checked = autoContinuePref;
+    autoLabel.appendChild(autoContinueCheckbox);
+    const autoLabelText = doc.createElement('span');
+    autoLabelText.textContent = 'Auto-continue (1 s)';
+    autoLabel.appendChild(autoLabelText);
+    reviewControls.appendChild(autoLabel);
+
+    countdownDisplay = doc.createElement('div');
+    countdownDisplay.className = 'countdown-display';
+    reviewControls.appendChild(countdownDisplay);
+
+    host.appendChild(reviewControls);
   }
 
   function syncHighlight(): void {
@@ -105,39 +153,100 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     }
   }
 
-  function commit(idx: 0 | 1 | 2): void {
-    if (committed) return;
-    committed = true;
-    const cb = onCommitCallback;
+  function syncReviewingFeedback(): void {
+    if (currentProblem === null || pickedIndex === null) return;
+    const isCorrect = pickedIndex === currentProblem.correctIndex;
+    host.classList.remove('is-choosing');
+    host.classList.add('is-reviewing');
+    host.classList.add(isCorrect ? 'is-correct' : 'is-incorrect');
+    for (let i = 0; i < choiceElements.length; i++) {
+      const el = choiceElements[i]!;
+      el.classList.remove('is-highlighted');
+      el.classList.toggle('is-correct-answer', i === currentProblem.correctIndex);
+      el.classList.toggle(
+        'is-wrong-pick',
+        !isCorrect && i === pickedIndex,
+      );
+    }
+    const feedback = host.querySelector('.review-feedback');
+    if (feedback instanceof HTMLElement) {
+      feedback.textContent = isCorrect ? 'Correct!' : 'Incorrect';
+    }
+  }
+
+  function updateCountdownDisplay(): void {
+    if (!countdownDisplay) return;
+    const secs = Math.max(0, countdownRemainingMs) / 1000;
+    countdownDisplay.textContent = `Resuming in ${secs.toFixed(1)} s`;
+  }
+
+  function startCountdown(): void {
+    countdownRemainingMs = autoContinuePref ? COUNTDOWN_AUTO_MS : COUNTDOWN_DEFAULT_MS;
+    updateCountdownDisplay();
+    clearTimers();
+    countdownIntervalId = setInterval(() => {
+      countdownRemainingMs -= COUNTDOWN_TICK_MS;
+      if (countdownRemainingMs <= 0) {
+        resolve();
+      } else {
+        updateCountdownDisplay();
+      }
+    }, COUNTDOWN_TICK_MS);
+  }
+
+  function pick(choiceIndex: 0 | 1 | 2): void {
+    if (state !== 'choosing') return;
+    state = 'reviewing';
+    pickedIndex = choiceIndex;
+    syncReviewingFeedback();
+    startCountdown();
+  }
+
+  function resolve(): void {
+    if (state !== 'reviewing' || pickedIndex === null) return;
+    const cb = onResolveCb;
+    const idx = pickedIndex;
+    state = 'closed';
+    pickedIndex = null;
+    onResolveCb = null;
+    clearTimers();
     teardownListeners();
-    onCommitCallback = null;
     if (cb) cb(idx);
   }
 
   function onKeyDown(event: Event): void {
-    if (!active) return;
+    if (state === 'closed') return;
     const ke = event as KeyboardEvent;
-    if (KEY_NAVIGATE_PREV.has(ke.key)) {
-      highlight = ((highlight + 2) % 3) as 0 | 1 | 2;
-      syncHighlight();
-      ke.preventDefault?.();
-      return;
+    if (state === 'choosing') {
+      if (KEY_NAV_PREV.has(ke.key)) {
+        highlight = ((highlight + 2) % 3) as 0 | 1 | 2;
+        syncHighlight();
+        ke.preventDefault?.();
+        return;
+      }
+      if (KEY_NAV_NEXT.has(ke.key)) {
+        highlight = ((highlight + 1) % 3) as 0 | 1 | 2;
+        syncHighlight();
+        ke.preventDefault?.();
+        return;
+      }
+      if (KEY_COMMIT.has(ke.key)) {
+        ke.preventDefault?.();
+        pick(highlight);
+        return;
+      }
     }
-    if (KEY_NAVIGATE_NEXT.has(ke.key)) {
-      highlight = ((highlight + 1) % 3) as 0 | 1 | 2;
-      syncHighlight();
-      ke.preventDefault?.();
-      return;
-    }
-    if (KEY_COMMIT.has(ke.key)) {
-      ke.preventDefault?.();
-      commit(highlight);
-      return;
+    if (state === 'reviewing') {
+      // Any commit key during reviewing triggers Continue.
+      if (KEY_COMMIT.has(ke.key)) {
+        ke.preventDefault?.();
+        resolve();
+      }
     }
   }
 
   function onChoiceClick(event: Event): void {
-    if (!active) return;
+    if (state !== 'choosing') return;
     const target = event.target as HTMLElement | null;
     const el = target?.closest?.('.answer-choice') as HTMLElement | null;
     if (!el) return;
@@ -145,46 +254,79 @@ export function createProblemModal(host: HTMLElement): ProblemModal {
     if (idxAttr === null) return;
     const idx = Number(idxAttr);
     if (idx !== 0 && idx !== 1 && idx !== 2) return;
-    commit(idx as 0 | 1 | 2);
+    pick(idx as 0 | 1 | 2);
+  }
+
+  function onContinueClick(): void {
+    if (state === 'reviewing') resolve();
+  }
+
+  function onAutoContinueChange(): void {
+    if (!autoContinueCheckbox) return;
+    autoContinuePref = autoContinueCheckbox.checked;
+    // If currently reviewing, retime the countdown to the new total.
+    if (state === 'reviewing') {
+      startCountdown();
+    }
+  }
+
+  function setupListeners(): void {
+    win.addEventListener('keydown', onKeyDown, true);
+    host.addEventListener('click', onChoiceClick);
+    host.addEventListener('pointerdown', onChoiceClick);
+    continueButton?.addEventListener('click', onContinueClick);
+    autoContinueCheckbox?.addEventListener('change', onAutoContinueChange);
   }
 
   function teardownListeners(): void {
-    active = false;
     win.removeEventListener('keydown', onKeyDown, true);
     host.removeEventListener('click', onChoiceClick);
     host.removeEventListener('pointerdown', onChoiceClick);
+    continueButton?.removeEventListener('click', onContinueClick);
+    autoContinueCheckbox?.removeEventListener('change', onAutoContinueChange);
   }
 
   function show(
     problem: Problem,
-    onCommit: (choiceIndex: 0 | 1 | 2) => void,
+    onResolve: (choiceIndex: 0 | 1 | 2) => void,
   ): void {
-    onCommitCallback = onCommit;
+    currentProblem = problem;
+    onResolveCb = onResolve;
     highlight = 0;
-    committed = false;
+    pickedIndex = null;
+    state = 'choosing';
     buildBody(problem);
     syncHighlight();
+    host.classList.add('is-choosing');
     host.classList.remove('hidden');
-    active = true;
-    win.addEventListener('keydown', onKeyDown, true);
-    host.addEventListener('click', onChoiceClick);
-    host.addEventListener('pointerdown', onChoiceClick);
+    setupListeners();
   }
 
   function hide(): void {
+    clearTimers();
     teardownListeners();
     host.classList.add('hidden');
+    host.classList.remove('is-choosing', 'is-reviewing', 'is-correct', 'is-incorrect');
     host.innerHTML = '';
     choiceElements = [];
-    onCommitCallback = null;
-    committed = false;
+    continueButton = null;
+    autoContinueCheckbox = null;
+    countdownDisplay = null;
+    state = 'closed';
+    currentProblem = null;
+    onResolveCb = null;
+    pickedIndex = null;
   }
 
   function destroy(): void {
+    clearTimers();
     teardownListeners();
     host.innerHTML = '';
     choiceElements = [];
-    onCommitCallback = null;
+    continueButton = null;
+    autoContinueCheckbox = null;
+    countdownDisplay = null;
+    onResolveCb = null;
   }
 
   return { show, hide, destroy };
