@@ -753,6 +753,21 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     player.position.y = Math.abs(Math.cos(stridePhase)) * 0.07;
     player.rotation.x = 0.16;
 
+    // Post-respawn invincibility blink: oscillate the runner figure's
+    // visibility at ~6 Hz while invincibilityRemainingMs > 0. The trail
+    // and the rest of the scene stay visible; only the figure flickers,
+    // which reads as the standard "I'm invincible right now" cue. During
+    // 'answering' (modal open) invincibility doesn't tick, so the figure
+    // freezes in whichever state it last rendered.
+    if (world.invincibilityRemainingMs > 0) {
+      // Use tickMs as the time base so the blink phase is deterministic
+      // and tied to the same clock that gates tickInvincibility.
+      const blinkPhase = (world.tickMs * 0.012) % 1; // ~6 Hz at typical dtMs
+      player.visible = blinkPhase < 0.5;
+    } else {
+      player.visible = true;
+    }
+
     // Scroll rungs toward the camera.
     const distanceDelta = world.distanceUnits - lastDistance;
     lastDistance = world.distanceUnits;
