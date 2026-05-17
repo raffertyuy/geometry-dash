@@ -7,6 +7,7 @@ function bootstrap(): void {
   const debugOverlay = document.querySelector<HTMLElement>('#debug-overlay');
   const score = document.querySelector<HTMLElement>('#score');
   const timer = document.querySelector<HTMLElement>('#timer');
+  const livesHud = document.querySelector<HTMLElement>('#lives-hud');
   const gameOverOverlay = document.querySelector<HTMLElement>('#game-over-overlay');
   const gameOverScore = document.querySelector<HTMLElement>('#game-over-score');
   const gameOverTimer = document.querySelector<HTMLElement>('#game-over-timer');
@@ -18,6 +19,7 @@ function bootstrap(): void {
     !debugOverlay ||
     !score ||
     !timer ||
+    !livesHud ||
     !gameOverOverlay ||
     !gameOverScore ||
     !gameOverTimer
@@ -29,6 +31,7 @@ function bootstrap(): void {
       debugOverlay,
       score,
       timer,
+      livesHud,
       gameOverOverlay,
       gameOverScore,
       gameOverTimer,
@@ -43,6 +46,7 @@ function bootstrap(): void {
     debugOverlay,
     score,
     timer,
+    livesHud,
     gameOverOverlay,
     gameOverScore,
     gameOverTimer,

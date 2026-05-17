@@ -8,7 +8,7 @@ import {
   startRun,
   tickWorld,
 } from './index';
-import { RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
+import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 
 describe('createWorldState', () => {
   it('starts in pre-run with zero distance and tickMs', () => {
@@ -17,6 +17,14 @@ describe('createWorldState', () => {
     expect(w.speedUnitsPerSec).toBe(RUN_SPEED_UNITS_PER_SEC);
     expect(w.distanceUnits).toBe(0);
     expect(w.tickMs).toBe(0);
+  });
+
+  it('initialises lives to MAX_LIVES with no invincibility, no scoreDelta, no activeGate', () => {
+    const w = createWorldState();
+    expect(w.lives).toBe(MAX_LIVES);
+    expect(w.invincibilityRemainingMs).toBe(0);
+    expect(w.scoreDelta).toBe(0);
+    expect(w.activeGate).toBeNull();
   });
 });
 
@@ -123,6 +131,19 @@ describe('tickWorld', () => {
     expect(w.tickMs).toBe(tickAtEnd);
   });
 
+  it("does not advance distance or tickMs from the 'answering' state", () => {
+    // World gets into 'answering' via enterAnswering during a real run; here
+    // we construct that shape directly to keep this test scoped to the guard.
+    let w = startRun(createWorldState());
+    w = tickWorld(w, 1234);
+    const distBefore = w.distanceUnits;
+    const tickBefore = w.tickMs;
+    const answering = { ...w, runState: 'answering' as const };
+    const afterTick = tickWorld(answering, 1000);
+    expect(afterTick.distanceUnits).toBe(distBefore);
+    expect(afterTick.tickMs).toBe(tickBefore);
+  });
+
   it('honours the optional speedOverride parameter when supplied', () => {
     let w = startRun(createWorldState());
     // 1.10x baseline override
@@ -204,5 +225,39 @@ describe('restartRun', () => {
     w = tickWorld(w, 1000);
     expect(w.distanceUnits).toBeCloseTo(RUN_SPEED_UNITS_PER_SEC, 5);
     expect(w.tickMs).toBe(1000);
+  });
+
+  it('resets lives back to MAX_LIVES even after lives were consumed in the previous run', () => {
+    let w = startRun(createWorldState());
+    const drained = { ...w, lives: 1, invincibilityRemainingMs: 1500 };
+    const restarted = restartRun(drained);
+    expect(restarted.lives).toBe(MAX_LIVES);
+    expect(restarted.invincibilityRemainingMs).toBe(0);
+  });
+
+  it('resets scoreDelta and activeGate on restart', () => {
+    let w = startRun(createWorldState());
+    const drained = {
+      ...w,
+      scoreDelta: -5000,
+      activeGate: {
+        gateId: 7,
+        difficulty: 'M' as const,
+        problem: {
+          id: 'm-test',
+          difficulty: 'M' as const,
+          prompt: 'p',
+          choices: [
+            { text: 'a' },
+            { text: 'b' },
+            { text: 'c' },
+          ] as const,
+          correctIndex: 0 as const,
+        },
+      },
+    };
+    const restarted = restartRun(drained);
+    expect(restarted.scoreDelta).toBe(0);
+    expect(restarted.activeGate).toBeNull();
   });
 });

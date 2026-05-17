@@ -18,12 +18,14 @@ import {
 } from '../runner-engine';
 import {
   createDebugOverlay,
+  createLivesHud,
   createThreeRenderer,
   type DebugOverlay,
+  type LivesHud,
   type ThreeRenderer,
 } from '../renderer';
 import { computeScore, formatScore, formatTimer } from '../score';
-import { RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
+import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type {
   InputEvent,
   ObstacleGroup,
@@ -41,6 +43,7 @@ export interface GameLoopHostElements {
   readonly debugOverlay: HTMLElement;
   readonly score: HTMLElement;
   readonly timer: HTMLElement;
+  readonly livesHud: HTMLElement;
   readonly gameOverOverlay: HTMLElement;
   readonly gameOverScore: HTMLElement;
   readonly gameOverTimer: HTMLElement;
@@ -77,6 +80,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
 
   const renderer: ThreeRenderer = createThreeRenderer(host.canvas);
   const debugOverlay: DebugOverlay = createDebugOverlay(host.debugOverlay);
+  const livesHud: LivesHud = createLivesHud(host.livesHud);
+  livesHud.set(MAX_LIVES);
 
   function showStartScreen(visible: boolean): void {
     host.startScreen.classList.toggle('hidden', !visible);
@@ -115,6 +120,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     loopState = 'running';
     isAwaitingRestart = false;
     showGameOverOverlay(false);
+    livesHud.set(world.lives);
     // Reset renderer's per-run caches (lastDistance, rung positions, trail
     // buffer) so the world doesn't "rewind" hugely on the first frame after
     // restart.
@@ -284,7 +290,10 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     renderer.updateObstacles(obstacles);
     renderer.draw(player, world);
     debugOverlay.update(player, world, lastInput);
-    host.score.textContent = formatScore(computeScore(world.tickMs));
+    livesHud.set(world.lives);
+    host.score.textContent = formatScore(
+      computeScore(world.tickMs, world.scoreDelta),
+    );
     host.timer.textContent = formatTimer(world.tickMs);
   }
 

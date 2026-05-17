@@ -19,33 +19,36 @@ const SECONDS_PER_MINUTE = 60;
 const MM_SS_THRESHOLD_MINUTES = 10;
 
 /**
- * Integer score derived from elapsed running time. Piecewise-linear: each
+ * Integer score derived from elapsed running time PLUS an optional signed
+ * scoreDelta from answer-driven events. Piecewise-linear in tickMs: each
  * 100 ms tick within tier N contributes
  *   BASE_SCORE_RATE + N * ESCALATION_SCORE_INCREMENT_PER_TIER
  * points. A fully completed tier N contributes
  *   ticksPerTier * (BASE_SCORE_RATE + N * INCREMENT)
  * points, where `ticksPerTier = ESCALATION_TIER_DURATION_MS / 100`.
  *
- * Cumulative score at time `tickMs` is the closed-form sum:
+ * Cumulative tick-derived score at time `tickMs` is the closed-form sum:
  *   N         = floor(tickMs / ESCALATION_TIER_DURATION_MS)
  *   completed = ticksPerTier * (N + INCREMENT * N * (N - 1) / 2)
  *   current   = floor((tickMs - N * ESCALATION_TIER_DURATION_MS) / 100)
  *               * (BASE_SCORE_RATE + N * INCREMENT)
- *   score     = completed + current
+ *   tickScore = completed + current
+ *   total     = tickScore + scoreDelta
+ *
+ * `scoreDelta` is the signed running sum of answer-driven changes from
+ * problem gates (+/-1000/5000/10000). With `scoreDelta` omitted or 0 the
+ * function returns the pure tick-derived value (behaviour unchanged from
+ * slice 004). The tick-derived component is ALWAYS additive — only
+ * `scoreDelta` can drive the total below zero (per spec FR-014).
  *
  * For the spec's default config (TIER=30_000 ms, INCREMENT=1, base=1):
- *   computeScore(0)        -> 0
- *   computeScore(30_000)   -> 300
- *   computeScore(60_000)   -> 900
- *   computeScore(90_000)   -> 1800
- *
- * For the active testing config (TIER=10_000 ms, INCREMENT=10, base=1):
- *   computeScore(0)        -> 0
- *   computeScore(10_000)   -> 100   (tier 0 at rate 1: 100 ticks * 1)
- *   computeScore(20_000)   -> 1200  (+ tier 1 at rate 11: 100 * 11)
- *   computeScore(30_000)   -> 3300  (+ tier 2 at rate 21: 100 * 21)
+ *   computeScore(0)              -> 0
+ *   computeScore(30_000)         -> 300
+ *   computeScore(60_000)         -> 900
+ *   computeScore(10_000, 1000)   -> 1100  (tier 0 + correct B answer)
+ *   computeScore(10_000, -5000)  -> -4900 (tier 0 + wrong M answer)
  */
-export function computeScore(tickMs: number): number {
+export function computeScore(tickMs: number, scoreDelta = 0): number {
   const ticksPerTier = ESCALATION_TIER_DURATION_MS / SCORE_TICK_MS;
   const N = Math.floor(tickMs / ESCALATION_TIER_DURATION_MS);
   const completed =
@@ -56,7 +59,7 @@ export function computeScore(tickMs: number): number {
   const currentTicks = Math.floor(
     (tickMs - N * ESCALATION_TIER_DURATION_MS) / SCORE_TICK_MS,
   );
-  return completed + currentTicks * currentRate;
+  return completed + currentTicks * currentRate + scoreDelta;
 }
 
 /**

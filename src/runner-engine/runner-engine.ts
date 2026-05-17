@@ -1,4 +1,4 @@
-import { RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
+import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type { WorldState } from '../shared/types';
 
 export function createWorldState(): WorldState {
@@ -7,6 +7,10 @@ export function createWorldState(): WorldState {
     speedUnitsPerSec: RUN_SPEED_UNITS_PER_SEC,
     distanceUnits: 0,
     tickMs: 0,
+    lives: MAX_LIVES,
+    invincibilityRemainingMs: 0,
+    scoreDelta: 0,
+    activeGate: null,
   };
 }
 
@@ -74,5 +78,9 @@ export function restartRun(world: WorldState): WorldState {
     speedUnitsPerSec: world.speedUnitsPerSec,
     distanceUnits: 0,
     tickMs: 0,
+    lives: MAX_LIVES,
+    invincibilityRemainingMs: 0,
+    scoreDelta: 0,
+    activeGate: null,
   };
 }

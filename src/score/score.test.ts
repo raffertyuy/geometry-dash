@@ -115,6 +115,48 @@ describe('computeScore - piecewise tier rate semantics', () => {
   });
 });
 
+describe('computeScore - optional scoreDelta parameter', () => {
+  it('returns the same value as the single-arg form when scoreDelta is omitted', () => {
+    expect(computeScore(0)).toBe(0);
+    expect(computeScore(10_000)).toBe(computeScore(10_000, 0));
+    expect(computeScore(60_000)).toBe(computeScore(60_000, 0));
+  });
+
+  it('returns the same value when scoreDelta is explicitly 0', () => {
+    expect(computeScore(10_000, 0)).toBe(computeScore(10_000));
+  });
+
+  it('adds a positive scoreDelta on top of the tick-derived score', () => {
+    const base = computeScore(10_000);
+    expect(computeScore(10_000, 1000)).toBe(base + 1000);
+    expect(computeScore(10_000, 5000)).toBe(base + 5000);
+    expect(computeScore(10_000, 10_000)).toBe(base + 10_000);
+  });
+
+  it('subtracts a negative scoreDelta from the tick-derived score', () => {
+    const base = computeScore(10_000);
+    expect(computeScore(10_000, -1000)).toBe(base - 1000);
+    expect(computeScore(10_000, -5000)).toBe(base - 5000);
+  });
+
+  it('allows the total to go negative when scoreDelta exceeds the tick-derived score', () => {
+    // Tier 0 at low elapsed time: tick score is small, so a wrong A answer
+    // (-10_000) drives the total well below zero. This is the FR-013 (b)
+    // condition: score < 0 triggers game-over.
+    const base = computeScore(1_000); // small (~10 in default config)
+    expect(computeScore(1_000, -10_000)).toBe(base - 10_000);
+    expect(computeScore(1_000, -10_000)).toBeLessThan(0);
+  });
+
+  it('the tick-derived component is unaffected by scoreDelta (additivity)', () => {
+    const a = computeScore(30_000);
+    const b = computeScore(30_000, 1234);
+    const c = computeScore(30_000, -1234);
+    expect(b - a).toBe(1234);
+    expect(c - a).toBe(-1234);
+  });
+});
+
 describe('formatScore', () => {
   it('formats zero as "0"', () => {
     expect(formatScore(0)).toBe('0');

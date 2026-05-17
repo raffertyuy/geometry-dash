@@ -50,6 +50,43 @@ export const ESCALATION_TIER_DURATION_MS = 30_000;
 export const ESCALATION_SCORE_INCREMENT_PER_TIER = 1;
 export const ESCALATION_SPEED_MULTIPLIER_PER_TIER = 1.10;
 
+// Lives + invincibility tunables. The player begins each run with MAX_LIVES
+// hearts; each obstacle collision OR wrong-answer life loss decrements by 1.
+// Only obstacle collisions grant the post-respawn invincibility window
+// (per spec FR-010/FR-011). Wrong-answer life loss is instantaneous.
+export const MAX_LIVES = 3;
+export const INVINCIBILITY_DURATION_MS = 3_000;
+
+// Problem-gate scoring. Each gate's reward magnitude doubles as its penalty
+// magnitude: correct answer = +N points; wrong answer = -N points AND -1 life.
+export const GATE_POINTS_B = 1_000;
+export const GATE_POINTS_M = 5_000;
+export const GATE_POINTS_A = 10_000;
+
+// Per-lane gate distribution. For every non-obstacle lane in a spawned
+// obstacle row, the spawner independently samples a uniform value from
+// {empty, B, M, A} weighted by these constants. The four values MUST sum
+// to 1.0; the spec imposes no balancing constraint, so all-same-difficulty
+// rows like A-A-A or all-empty rows are valid output.
+export const GATE_LANE_PROBABILITY_EMPTY = 0.25;
+export const GATE_LANE_PROBABILITY_B = 0.25;
+export const GATE_LANE_PROBABILITY_M = 0.25;
+export const GATE_LANE_PROBABILITY_A = 0.25;
+
+if (
+  Math.abs(
+    GATE_LANE_PROBABILITY_EMPTY +
+      GATE_LANE_PROBABILITY_B +
+      GATE_LANE_PROBABILITY_M +
+      GATE_LANE_PROBABILITY_A -
+      1.0,
+  ) > 1e-9
+) {
+  console.warn(
+    'GATE_LANE_PROBABILITY_* values do not sum to 1.0; gate-spawn distribution will be biased.',
+  );
+}
+
 function readDebugFlag(): boolean {
   if (typeof window === 'undefined') return false;
   try {
