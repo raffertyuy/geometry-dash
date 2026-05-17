@@ -1,14 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import {
+  consumeLife,
   createWorldState,
   endRun,
+  enterAnswering,
   pauseRun,
+  resolveAnswer,
   restartRun,
   resumeRun,
   startRun,
+  tickInvincibility,
   tickWorld,
 } from './index';
-import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
+import {
+  INVINCIBILITY_DURATION_MS,
+  MAX_LIVES,
+  RUN_SPEED_UNITS_PER_SEC,
+} from '../shared/config';
+import type { ProblemGate } from '../shared/types';
+
+function makeGate(
+  id = 1,
+  difficulty: 'B' | 'M' | 'A' = 'B',
+  lane: 'left' | 'centre' | 'right' = 'centre',
+): ProblemGate {
+  return {
+    id,
+    difficulty,
+    lane,
+    problem: {
+      id: `${difficulty.toLowerCase()}-test`,
+      difficulty,
+      prompt: 'test',
+      choices: [{ text: 'a' }, { text: 'b' }, { text: 'c' }] as const,
+      correctIndex: 0,
+    },
+    worldZ: 0,
+    previousWorldZ: -1,
+  };
+}
 
 describe('createWorldState', () => {
   it('starts in pre-run with zero distance and tickMs', () => {
@@ -228,7 +258,7 @@ describe('restartRun', () => {
   });
 
   it('resets lives back to MAX_LIVES even after lives were consumed in the previous run', () => {
-    let w = startRun(createWorldState());
+    const w = startRun(createWorldState());
     const drained = { ...w, lives: 1, invincibilityRemainingMs: 1500 };
     const restarted = restartRun(drained);
     expect(restarted.lives).toBe(MAX_LIVES);
@@ -236,7 +266,7 @@ describe('restartRun', () => {
   });
 
   it('resets scoreDelta and activeGate on restart', () => {
-    let w = startRun(createWorldState());
+    const w = startRun(createWorldState());
     const drained = {
       ...w,
       scoreDelta: -5000,
@@ -259,5 +289,165 @@ describe('restartRun', () => {
     const restarted = restartRun(drained);
     expect(restarted.scoreDelta).toBe(0);
     expect(restarted.activeGate).toBeNull();
+  });
+});
+
+describe('enterAnswering', () => {
+  it('transitions running -> answering with the gate stored on activeGate', () => {
+    const w = startRun(createWorldState());
+    const gate = makeGate(7, 'M', 'left');
+    const next = enterAnswering(w, gate);
+    expect(next.runState).toBe('answering');
+    expect(next.activeGate).not.toBeNull();
+    expect(next.activeGate!.gateId).toBe(7);
+    expect(next.activeGate!.difficulty).toBe('M');
+    expect(next.activeGate!.problem.id).toBe('m-test');
+  });
+
+  it('is a no-op when world is paused', () => {
+    const w = pauseRun(startRun(createWorldState()));
+    const next = enterAnswering(w, makeGate());
+    expect(next).toEqual(w);
+  });
+
+  it('is a no-op when world is already answering', () => {
+    const w = startRun(createWorldState());
+    const onceAnswering = enterAnswering(w, makeGate(1));
+    const twice = enterAnswering(onceAnswering, makeGate(2));
+    expect(twice).toEqual(onceAnswering);
+  });
+
+  it('is a no-op when world is game-over', () => {
+    const w = endRun(startRun(createWorldState()));
+    expect(enterAnswering(w, makeGate())).toEqual(w);
+  });
+});
+
+describe('consumeLife', () => {
+  it("with 'obstacle' cause and lives > 1: decrements lives, sets the invincibility window", () => {
+    const w = startRun(createWorldState());
+    const next = consumeLife(w, 'obstacle');
+    expect(next.lives).toBe(MAX_LIVES - 1);
+    expect(next.invincibilityRemainingMs).toBe(INVINCIBILITY_DURATION_MS);
+    expect(next.runState).toBe('running');
+  });
+
+  it("with 'wrong-answer' cause and lives > 1: decrements lives, does NOT set invincibility", () => {
+    const w = startRun(createWorldState());
+    const next = consumeLife(w, 'wrong-answer');
+    expect(next.lives).toBe(MAX_LIVES - 1);
+    expect(next.invincibilityRemainingMs).toBe(0);
+    expect(next.runState).toBe('running');
+  });
+
+  it("with 'obstacle' cause on the LAST life: transitions to game-over, no invincibility", () => {
+    let w = startRun(createWorldState());
+    w = { ...w, lives: 1 };
+    const next = consumeLife(w, 'obstacle');
+    expect(next.lives).toBe(0);
+    expect(next.runState).toBe('game-over');
+    expect(next.invincibilityRemainingMs).toBe(0);
+  });
+
+  it("with 'wrong-answer' cause on the LAST life: transitions to game-over", () => {
+    let w = startRun(createWorldState());
+    w = { ...w, lives: 1 };
+    const next = consumeLife(w, 'wrong-answer');
+    expect(next.lives).toBe(0);
+    expect(next.runState).toBe('game-over');
+  });
+
+  it('is a no-op when lives is already 0 (no double-decrement)', () => {
+    const w = { ...startRun(createWorldState()), lives: 0 };
+    const next = consumeLife(w, 'obstacle');
+    expect(next).toEqual(w);
+  });
+});
+
+describe('resolveAnswer', () => {
+  function enterAnsweringHelper(
+    lives = MAX_LIVES,
+    scoreDelta = 0,
+    tickMs = 10_000,
+  ) {
+    let w = startRun(createWorldState());
+    w = tickWorld(w, tickMs);
+    w = { ...w, lives, scoreDelta };
+    return enterAnswering(w, makeGate(1, 'B', 'centre'));
+  }
+
+  it('on correct answer: adds +points to scoreDelta, returns to running, lives unchanged', () => {
+    const w = enterAnsweringHelper(3, 0);
+    const next = resolveAnswer(w, true, 1000);
+    expect(next.scoreDelta).toBe(1000);
+    expect(next.runState).toBe('running');
+    expect(next.activeGate).toBeNull();
+    expect(next.lives).toBe(3);
+  });
+
+  it('on wrong answer with lives > 1: subtracts points AND decrements lives, returns to running', () => {
+    const w = enterAnsweringHelper(3, 0);
+    const next = resolveAnswer(w, false, 5000);
+    expect(next.scoreDelta).toBe(-5000);
+    expect(next.lives).toBe(2);
+    expect(next.runState).toBe('running');
+    expect(next.activeGate).toBeNull();
+  });
+
+  it('on wrong answer with lives === 1: transitions to game-over via consumeLife', () => {
+    const w = enterAnsweringHelper(1, 0);
+    const next = resolveAnswer(w, false, 1000);
+    expect(next.lives).toBe(0);
+    expect(next.runState).toBe('game-over');
+    expect(next.activeGate).toBeNull();
+  });
+
+  it("on wrong answer: does NOT set invincibility (cause is 'wrong-answer')", () => {
+    const w = enterAnsweringHelper(3, 0);
+    const next = resolveAnswer(w, false, 5000);
+    expect(next.invincibilityRemainingMs).toBe(0);
+  });
+
+  it('accumulates scoreDelta across multiple answers', () => {
+    let w = enterAnsweringHelper(3, 0);
+    w = resolveAnswer(w, true, 1000); // +1000
+    w = enterAnswering(w, makeGate(2, 'M', 'centre'));
+    w = resolveAnswer(w, false, 5000); // -5000
+    expect(w.scoreDelta).toBe(-4000);
+  });
+
+  it('is a no-op when world is not in answering state', () => {
+    const w = startRun(createWorldState());
+    expect(resolveAnswer(w, true, 1000)).toEqual(w);
+  });
+});
+
+describe('tickInvincibility', () => {
+  it('decrements invincibilityRemainingMs by dtMs', () => {
+    const w = consumeLife(startRun(createWorldState()), 'obstacle');
+    expect(w.invincibilityRemainingMs).toBe(INVINCIBILITY_DURATION_MS);
+    const after = tickInvincibility(w, 500);
+    expect(after.invincibilityRemainingMs).toBe(INVINCIBILITY_DURATION_MS - 500);
+  });
+
+  it('clamps to 0 when dtMs exceeds remaining time', () => {
+    let w = consumeLife(startRun(createWorldState()), 'obstacle');
+    w = { ...w, invincibilityRemainingMs: 200 };
+    const after = tickInvincibility(w, 500);
+    expect(after.invincibilityRemainingMs).toBe(0);
+  });
+
+  it('is a no-op when invincibilityRemainingMs is already 0', () => {
+    const w = startRun(createWorldState());
+    expect(w.invincibilityRemainingMs).toBe(0);
+    const after = tickInvincibility(w, 1000);
+    expect(after).toEqual(w);
+  });
+
+  it('is a no-op outside the running state', () => {
+    let w = consumeLife(startRun(createWorldState()), 'obstacle');
+    w = pauseRun(w);
+    const after = tickInvincibility(w, 500);
+    expect(after).toEqual(w);
   });
 });

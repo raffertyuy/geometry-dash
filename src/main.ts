@@ -11,6 +11,8 @@ function bootstrap(): void {
   const gameOverOverlay = document.querySelector<HTMLElement>('#game-over-overlay');
   const gameOverScore = document.querySelector<HTMLElement>('#game-over-score');
   const gameOverTimer = document.querySelector<HTMLElement>('#game-over-timer');
+  const problemModal = document.querySelector<HTMLElement>('#problem-modal');
+  const floatingScores = document.querySelector<HTMLElement>('#floating-scores');
 
   if (
     !canvas ||
@@ -22,7 +24,9 @@ function bootstrap(): void {
     !livesHud ||
     !gameOverOverlay ||
     !gameOverScore ||
-    !gameOverTimer
+    !gameOverTimer ||
+    !problemModal ||
+    !floatingScores
   ) {
     console.error('Game bootstrap: required DOM elements not found', {
       canvas,
@@ -35,6 +39,8 @@ function bootstrap(): void {
       gameOverOverlay,
       gameOverScore,
       gameOverTimer,
+      problemModal,
+      floatingScores,
     });
     return;
   }
@@ -50,6 +56,8 @@ function bootstrap(): void {
     gameOverOverlay,
     gameOverScore,
     gameOverTimer,
+    problemModal,
+    floatingScores,
   });
 }
 

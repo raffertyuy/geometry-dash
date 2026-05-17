@@ -182,6 +182,117 @@
         letter-spacing: 0.18em;
         margin: 0 0 0.2em 0;
       }
+
+      /* Problem-gate answer modal. Reuses the .overlay base for the
+         backdrop; adds its own panel-style layout for the question text
+         and the three tappable answer choices. */
+      #problem-modal {
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        pointer-events: auto;
+      }
+
+      #problem-modal .problem-difficulty {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(0.85rem, 2vw, 1.1rem);
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        text-shadow: 0 0 6px currentColor;
+      }
+
+      #problem-modal .problem-text {
+        font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+        font-weight: 600;
+        max-width: min(90vw, 640px);
+        color: #e8e8ef;
+        line-height: 1.35;
+      }
+
+      #problem-modal .answer-choices {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: min(86vw, 480px);
+      }
+
+      #problem-modal .answer-choice {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 48px;
+        padding: 10px 16px;
+        border: 1.5px solid rgba(24, 200, 255, 0.5);
+        border-radius: 10px;
+        background: rgba(15, 30, 50, 0.6);
+        color: #e8e8ef;
+        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        font-weight: 500;
+        cursor: pointer;
+        user-select: none;
+        transition: border-color 120ms ease-out, background 120ms ease-out, box-shadow 120ms ease-out;
+      }
+
+      #problem-modal .answer-choice .answer-letter {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 1.1em;
+        font-weight: 700;
+        color: #18c8ff;
+        min-width: 1.2em;
+        text-align: center;
+      }
+
+      #problem-modal .answer-choice.is-highlighted {
+        border-color: #18c8ff;
+        background: rgba(24, 200, 255, 0.18);
+        box-shadow: 0 0 12px rgba(24, 200, 255, 0.45);
+      }
+
+      /* Floating "+1000" / "-5000" badges that drift up from the score
+         readout when a problem gate resolves. Each badge is appended,
+         then on the next frame gains .floating-score--rising which
+         triggers the translateY + opacity transition. transitionend
+         removes the element. */
+      #floating-scores {
+        position: fixed;
+        top: clamp(48px, 6vh, 64px);
+        right: 20px;
+        z-index: 6;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+      }
+
+      .floating-score {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(1.1rem, 3vw, 1.6rem);
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-shadow: 0 0 10px currentColor;
+        transform: translateY(0);
+        opacity: 1;
+        transition: transform 1s ease-out, opacity 1s ease-out;
+        will-change: transform, opacity;
+      }
+
+      .floating-score--green {
+        color: #22cc88;
+      }
+
+      .floating-score--red {
+        color: #ff5a5a;
+      }
+
+      .floating-score--rising {
+        transform: translateY(-72px);
+        opacity: 0;
+      }
     </style>
   </head>
   <body>
@@ -213,6 +324,10 @@ Swipe left or right on mobile</p>
       <p class="game-over-stat" id="game-over-timer">0:00</p>
       <p class="hint">Tap or press any key to play again</p>
     </div>
+
+    <div id="problem-modal" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Problem"></div>
+
+    <div id="floating-scores" aria-hidden="true"></div>
 
     <div id="debug-overlay" class="hidden"></div>
 

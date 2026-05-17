@@ -6,12 +6,15 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { easeOutCubic } from '../lane-state';
+import { GATE_CATALOGUE } from '../problem-gates';
 import { LANE_X } from '../shared/config';
 import type {
+  GateDifficulty,
   ObstacleColorVariant,
   ObstacleGroup,
   ObstacleVariantId,
   PlayerState,
+  ProblemGate,
   WorldState,
 } from '../shared/types';
 
@@ -88,6 +91,7 @@ export interface ThreeRenderer {
   draw(player: PlayerState, world: WorldState): void;
   resize(widthPx: number, heightPx: number): void;
   updateObstacles(groups: readonly ObstacleGroup[]): void;
+  updateGates(gates: readonly ProblemGate[]): void;
   /**
    * Resets per-run internal state (cached distance baseline, scrolling-rung
    * positions, speed-line positions, trail buffer). Must be called by the
@@ -99,6 +103,10 @@ export interface ThreeRenderer {
   reset(): void;
   destroy(): void;
 }
+
+const GATE_SIZE = 1.3;
+const GATE_FLOAT_Y = 1.1;
+const GATE_POOL_SIZE = 12;
 
 const OBSTACLE_POOL_SIZE = 12;
 const OBSTACLE_HEIGHTS: Readonly<Record<ObstacleVariantId, number>> = {
@@ -496,6 +504,150 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     obstaclePool.set(variantId, slots);
   }
 
+  // ---- Problem-gate mesh pool ------------------------------------------
+
+  // Each gate is a THREE.Group of:
+  //   - body: muted-coloured BoxGeometry mesh, slightly emissive
+  //   - edges: LineSegments2 overlay showing the 12 outer edges PLUS the
+  //            24 interior 3x3-grid lines that give the Rubik's-cube look
+  // The grid lines are the secondary visual distinguisher from obstacles
+  // (the primary one is the muted-vs-saturated palette).
+
+  function buildRubiksGridGeometry(size: number): LineSegmentsGeometry {
+    const half = size / 2;
+    const third = size / 3;
+    const inner = [-half + third, half - third];
+    const positions: number[] = [];
+    function seg(
+      x1: number, y1: number, z1: number,
+      x2: number, y2: number, z2: number,
+    ): void {
+      positions.push(x1, y1, z1, x2, y2, z2);
+    }
+    // Interior grid on each face (2 horizontal + 2 vertical lines per face).
+    // Front (z=+half), Back (z=-half): grid in X,Y.
+    for (const z of [-half, half]) {
+      for (const x of inner) seg(x, -half, z, x, half, z);
+      for (const y of inner) seg(-half, y, z, half, y, z);
+    }
+    // Left (x=-half), Right (x=+half): grid in Y,Z.
+    for (const x of [-half, half]) {
+      for (const y of inner) seg(x, y, -half, x, y, half);
+      for (const z of inner) seg(x, -half, z, x, half, z);
+    }
+    // Top (y=+half), Bottom (y=-half): grid in X,Z.
+    for (const y of [-half, half]) {
+      for (const x of inner) seg(x, y, -half, x, y, half);
+      for (const z of inner) seg(-half, y, z, half, y, z);
+    }
+    // 12 outer edges of the cube.
+    const corners: ReadonlyArray<readonly [number, number, number]> = [
+      [-half, -half, -half], [-half, -half, half],
+      [-half, half, -half], [-half, half, half],
+      [half, -half, -half], [half, -half, half],
+      [half, half, -half], [half, half, half],
+    ];
+    for (let i = 0; i < corners.length; i++) {
+      for (let j = i + 1; j < corners.length; j++) {
+        const a = corners[i]!;
+        const b = corners[j]!;
+        const diff =
+          (a[0] !== b[0] ? 1 : 0) +
+          (a[1] !== b[1] ? 1 : 0) +
+          (a[2] !== b[2] ? 1 : 0);
+        if (diff === 1) {
+          seg(a[0], a[1], a[2], b[0], b[1], b[2]);
+        }
+      }
+    }
+    const lsg = new LineSegmentsGeometry();
+    lsg.setPositions(new Float32Array(positions));
+    return lsg;
+  }
+
+  const gateGeometry = new THREE.BoxGeometry(GATE_SIZE, GATE_SIZE, GATE_SIZE);
+  const gateEdgeGeometry = buildRubiksGridGeometry(GATE_SIZE);
+
+  function gateColorHexToNumber(hex: string): number {
+    return parseInt(hex.slice(1), 16);
+  }
+
+  function makeGateBodyMaterial(d: GateDifficulty): THREE.MeshStandardMaterial {
+    const color = gateColorHexToNumber(GATE_CATALOGUE[d].colorHex);
+    return new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 0.55,
+      roughness: 0.45,
+      metalness: 0.35,
+      transparent: true,
+      opacity: 0.78,
+      flatShading: true,
+      toneMapped: true,
+    });
+  }
+
+  function makeGateEdgeMaterial(d: GateDifficulty): LineMaterial {
+    const color = gateColorHexToNumber(GATE_CATALOGUE[d].colorHex);
+    const mat = new LineMaterial({
+      color,
+      linewidth: 1.6,
+      worldUnits: false,
+      transparent: false,
+      depthWrite: true,
+      toneMapped: false,
+    });
+    mat.resolution.set(canvas.clientWidth, canvas.clientHeight);
+    return mat;
+  }
+
+  const gateBodyMaterials: Readonly<Record<GateDifficulty, THREE.MeshStandardMaterial>> = {
+    B: makeGateBodyMaterial('B'),
+    M: makeGateBodyMaterial('M'),
+    A: makeGateBodyMaterial('A'),
+  };
+  const gateEdgeMaterials: Readonly<Record<GateDifficulty, LineMaterial>> = {
+    B: makeGateEdgeMaterial('B'),
+    M: makeGateEdgeMaterial('M'),
+    A: makeGateEdgeMaterial('A'),
+  };
+
+  interface GateSlot {
+    readonly group: THREE.Group;
+    readonly body: THREE.Mesh;
+    readonly edges: LineSegments2;
+  }
+
+  const gatePool: GateSlot[] = [];
+  for (let i = 0; i < GATE_POOL_SIZE; i++) {
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(gateGeometry, gateBodyMaterials.B);
+    const edges = new LineSegments2(gateEdgeGeometry, gateEdgeMaterials.B);
+    grp.add(body);
+    grp.add(edges);
+    grp.visible = false;
+    scene.add(grp);
+    gatePool.push({ group: grp, body, edges });
+  }
+
+  function updateGates(gates: readonly ProblemGate[]): void {
+    let used = 0;
+    for (const g of gates) {
+      if (used >= gatePool.length) break;
+      const slot = gatePool[used]!;
+      slot.group.position.set(LANE_X[g.lane], GATE_FLOAT_Y, g.worldZ);
+      // Subtle slow rotation around Y so the grid faces catch the light.
+      slot.group.rotation.y = (g.worldZ * 0.05 + g.id * 0.7) % (Math.PI * 2);
+      slot.body.material = gateBodyMaterials[g.difficulty];
+      slot.edges.material = gateEdgeMaterials[g.difficulty];
+      slot.group.visible = true;
+      used++;
+    }
+    for (let i = used; i < gatePool.length; i++) {
+      gatePool[i]!.group.visible = false;
+    }
+  }
+
   function updateObstacles(groups: readonly ObstacleGroup[]): void {
     const usage = new Map<ObstacleVariantId, number>();
     for (const variantId of obstaclePool.keys()) usage.set(variantId, 0);
@@ -695,6 +847,9 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     obstacleEdgeMaterials.red.resolution.set(widthPx, heightPx);
     obstacleEdgeMaterials.blue.resolution.set(widthPx, heightPx);
     obstacleEdgeMaterials.green.resolution.set(widthPx, heightPx);
+    gateEdgeMaterials.B.resolution.set(widthPx, heightPx);
+    gateEdgeMaterials.M.resolution.set(widthPx, heightPx);
+    gateEdgeMaterials.A.resolution.set(widthPx, heightPx);
   }
 
   function reset(): void {
@@ -735,5 +890,5 @@ export function createThreeRenderer(canvas: HTMLCanvasElement): ThreeRenderer {
     });
   }
 
-  return { draw, resize, updateObstacles, reset, destroy };
+  return { draw, resize, updateObstacles, updateGates, reset, destroy };
 }
