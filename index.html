@@ -724,27 +724,38 @@
         outline: none;
       }
 
-      /* Pause button — centred affordance shown only during an active run,
-         sitting just below the HUD row so it never collides with the centred
-         timer readout. Disabled state applies during gate modals + respawn
-         invincibility, conveyed visually by reduced opacity + no-cursor. */
+      /* Pause button — bottom-right FAB sized for a right-handed thumb on
+         mobile (≥56px touch target, circular, semi-transparent so the lane
+         underneath stays readable). Disabled state applies during gate modals
+         + respawn invincibility, conveyed visually by reduced opacity +
+         no-cursor. Respects iOS safe-area insets so it never sits under the
+         home-indicator gesture strip. */
       .pause-button {
         appearance: none;
-        background: rgba(8, 12, 24, 0.7);
-        border: 1px solid rgba(24, 200, 255, 0.45);
-        border-radius: 6px;
+        align-items: center;
+        background: rgba(8, 12, 24, 0.72);
+        border: 2px solid rgba(24, 200, 255, 0.55);
+        border-radius: 50%;
+        bottom: max(clamp(20px, 5vh, 36px), env(safe-area-inset-bottom));
+        box-shadow: 0 0 14px rgba(24, 200, 255, 0.32), inset 0 0 6px rgba(24, 200, 255, 0.12);
         color: #18c8ff;
         cursor: pointer;
-        font-size: clamp(1rem, 2.4vw, 1.25rem);
-        left: 50%;
+        display: inline-flex;
+        font-size: clamp(1.6rem, 5.5vw, 2.1rem);
+        height: clamp(56px, 14vw, 72px);
+        justify-content: center;
         line-height: 1;
-        padding: 0.3em 0.7em;
+        padding: 0;
         pointer-events: auto;
         position: fixed;
-        top: clamp(52px, 7vh, 72px);
-        transform: translateX(-50%);
-        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
+        right: max(clamp(16px, 4vw, 24px), env(safe-area-inset-right));
+        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out, transform 80ms ease-out;
+        width: clamp(56px, 14vw, 72px);
         z-index: 5;
+      }
+
+      .pause-button:active:not([disabled]):not(.is-disabled) {
+        transform: scale(0.94);
       }
 
       .pause-button:hover,
