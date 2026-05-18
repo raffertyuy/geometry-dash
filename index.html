@@ -724,8 +724,9 @@
         outline: none;
       }
 
-      /* Pause button — top-centre HUD affordance shown only during an
-         active run. Disabled state applies during gate modals + respawn
+      /* Pause button — centred affordance shown only during an active run,
+         sitting just below the HUD row so it never collides with the centred
+         timer readout. Disabled state applies during gate modals + respawn
          invincibility, conveyed visually by reduced opacity + no-cursor. */
       .pause-button {
         appearance: none;
@@ -740,7 +741,7 @@
         padding: 0.3em 0.7em;
         pointer-events: auto;
         position: fixed;
-        top: clamp(8px, 1.5vh, 16px);
+        top: clamp(52px, 7vh, 72px);
         transform: translateX(-50%);
         transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
         z-index: 5;
