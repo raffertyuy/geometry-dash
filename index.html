@@ -701,22 +701,30 @@
       }
 
       #how-to-play-overlay .close-button {
+        align-items: center;
         appearance: none;
         background: transparent;
-        border: none;
+        border: 1px solid transparent;
+        border-radius: 10px;
         color: #9090a0;
         cursor: pointer;
-        font-size: 1.4rem;
+        display: inline-flex;
+        font-size: clamp(1.8rem, 5.5vw, 2.2rem);
+        height: clamp(44px, 11vw, 56px);
+        justify-content: center;
         line-height: 1;
-        padding: 0.2em 0.5em;
+        padding: 0;
         position: absolute;
-        right: 0.5em;
-        top: 0.4em;
-        transition: color 120ms ease-out;
+        right: 0.4em;
+        top: 0.3em;
+        transition: color 120ms ease-out, background 120ms ease-out, border-color 120ms ease-out;
+        width: clamp(44px, 11vw, 56px);
       }
 
       #how-to-play-overlay .close-button:hover,
       #how-to-play-overlay .close-button:focus-visible {
+        background: rgba(24, 200, 255, 0.12);
+        border-color: rgba(24, 200, 255, 0.45);
         color: #18c8ff;
         outline: none;
       }
