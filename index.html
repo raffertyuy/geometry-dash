@@ -163,9 +163,6 @@
         letter-spacing: 0.04em;
         color: #ff8a30;
         order: 3;
-        /* Reserve clear space for the fixed-position mute button at the
-           top-right so the two never overlap on narrow viewports. */
-        margin-right: clamp(44px, 11vw, 60px);
       }
 
       #lives-hud {
@@ -451,9 +448,9 @@
       #floating-scores {
         position: fixed;
         top: clamp(48px, 6vh, 64px);
-        /* Aligned to where the score readout actually sits — see the
-           matching margin-right on #score above. */
-        right: clamp(64px, 13vw, 80px);
+        /* Aligned with the HUD's right padding so badges drift up beneath
+           the score readout. */
+        right: clamp(16px, 4vw, 24px);
         z-index: 6;
         pointer-events: none;
         display: flex;
@@ -725,17 +722,17 @@
       }
 
       /* Pause button — bottom-right FAB sized for a right-handed thumb on
-         mobile (≥56px touch target, circular, semi-transparent so the lane
-         underneath stays readable). Disabled state applies during gate modals
-         + respawn invincibility, conveyed visually by reduced opacity +
-         no-cursor. Respects iOS safe-area insets so it never sits under the
-         home-indicator gesture strip. */
+         mobile (≥56px touch target, rounded-square, semi-transparent so the
+         lane underneath stays readable). Disabled state applies during gate
+         modals + respawn invincibility, conveyed visually by reduced opacity
+         + no-cursor. Respects iOS safe-area insets so it never sits under
+         the home-indicator gesture strip. */
       .pause-button {
         appearance: none;
         align-items: center;
         background: rgba(8, 12, 24, 0.72);
         border: 2px solid rgba(24, 200, 255, 0.55);
-        border-radius: 50%;
+        border-radius: 18px;
         bottom: max(clamp(20px, 5vh, 36px), env(safe-area-inset-bottom));
         box-shadow: 0 0 14px rgba(24, 200, 255, 0.32), inset 0 0 6px rgba(24, 200, 255, 0.12);
         color: #18c8ff;
@@ -771,24 +768,36 @@
         opacity: 0.35;
       }
 
-      /* Mute button — always visible, always reachable. Positioned at the
-         top-right of the playfield, balancing the centred Pause button. */
+      /* Mute button — bottom-left FAB mirroring the Pause button so a
+         left-hand thumb can reach it just as easily as the right-hand
+         Pause. Same size, border-radius, and border treatment for a
+         consistent on-screen pair. Respects iOS safe-area insets. */
       .mute-button {
         appearance: none;
-        background: rgba(8, 12, 24, 0.7);
-        border: 1px solid rgba(24, 200, 255, 0.45);
-        border-radius: 6px;
+        align-items: center;
+        background: rgba(8, 12, 24, 0.72);
+        border: 2px solid rgba(24, 200, 255, 0.55);
+        border-radius: 18px;
+        bottom: max(clamp(20px, 5vh, 36px), env(safe-area-inset-bottom));
+        box-shadow: 0 0 14px rgba(24, 200, 255, 0.32), inset 0 0 6px rgba(24, 200, 255, 0.12);
         color: #18c8ff;
         cursor: pointer;
-        font-size: clamp(1rem, 2.4vw, 1.25rem);
+        display: inline-flex;
+        font-size: clamp(1.6rem, 5.5vw, 2.1rem);
+        height: clamp(56px, 14vw, 72px);
+        justify-content: center;
+        left: max(clamp(16px, 4vw, 24px), env(safe-area-inset-left));
         line-height: 1;
-        padding: 0.3em 0.55em;
+        padding: 0;
         pointer-events: auto;
         position: fixed;
-        right: clamp(8px, 1.5vw, 16px);
-        top: clamp(8px, 1.5vh, 16px);
-        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
+        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out, transform 80ms ease-out;
+        width: clamp(56px, 14vw, 72px);
         z-index: 5;
+      }
+
+      .mute-button:active:not([disabled]):not(.is-disabled) {
+        transform: scale(0.94);
       }
 
       .mute-button:hover,
@@ -801,7 +810,8 @@
       .mute-button.is-muted {
         color: #9090a0;
         border-color: rgba(144, 144, 160, 0.45);
-        opacity: 0.7;
+        box-shadow: 0 0 12px rgba(144, 144, 160, 0.25), inset 0 0 6px rgba(144, 144, 160, 0.1);
+        opacity: 0.78;
       }
 
       /* Big "ready-up" countdown shown after a problem-gate answer commits
