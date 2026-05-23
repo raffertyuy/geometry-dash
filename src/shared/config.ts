@@ -139,8 +139,8 @@ export const LEADERBOARD_PLAUSIBLE_MAX_PER_SECOND = 50_000;
 /** Floor on the plausibility bound — absorbs early-game flukes. */
 export const LEADERBOARD_PLAUSIBLE_MIN_FLOOR = 100_000;
 
-/** Max submissions per IP per fixed hour bucket. */
-export const LEADERBOARD_RATE_LIMIT_PER_HOUR = 10;
+/** Max submissions per IP per fixed UTC-hour bucket. */
+export const LEADERBOARD_RATE_LIMIT_PER_HOUR = 30;
 
 /** TTL on rate-limit bucket keys (= 2 x window length). */
 export const LEADERBOARD_RATE_LIMIT_BUCKET_TTL_SECONDS = 7200;

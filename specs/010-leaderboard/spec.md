@@ -117,7 +117,7 @@ A returning player sees their personal best (the highest score they have ever ac
 - **FR-021**: The backend MUST sort entries by score descending, ties broken by submission timestamp ascending (earlier wins).
 - **FR-022**: The backend MUST validate every submission: initials match `^[A-Z]{1,3}$`, score is a finite non-negative integer, run time is a finite non-negative integer, score is within an arithmetic upper bound derived from the run's elapsed time and the game's known maximum scoring rate (with a generous fudge factor to absorb genuine outliers).
 - **FR-023**: The backend MUST reject submissions whose initials match a small embedded profanity wordlist; rejections MUST NOT reveal the wordlist contents.
-- **FR-024**: The backend MUST rate-limit submissions per client IP to at most 10 per hour using a sliding window; rate-limited submissions MUST return a clear error code that the client can surface.
+- **FR-024**: The backend MUST rate-limit submissions per client IP to at most 30 per fixed UTC-hour window; rate-limited submissions MUST return a clear error code that the client can surface. Local-dev requests (no `CF-Connecting-IP` header) are exempt so contributors iterating against `wrangler dev` aren't locked out after a handful of test submissions.
 - **FR-025**: The backend MUST be architected so that a future cryptographic signing requirement (e.g. an HMAC on the payload) can be added without a breaking change to the read endpoint.
 
 #### Observability

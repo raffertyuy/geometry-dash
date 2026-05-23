@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { LEADERBOARD_MAX_ENTRIES } from '../shared/config';
+import {
+  LEADERBOARD_MAX_ENTRIES,
+  LEADERBOARD_RATE_LIMIT_PER_HOUR,
+} from '../shared/config';
 import { handleGet, handlePost, KV_KEY_TOP20, type HandlerContext } from './handlers';
 import { createInMemoryKVAdapter, type KVAdapter } from './kv-adapter';
 import type { LeaderboardEntry } from '../shared/leaderboard-types';
@@ -69,7 +72,7 @@ describe('handlePost', () => {
     const kv = createInMemoryKVAdapter();
     const at = new Date('2026-05-23T14:00:00.000Z');
     const baseCtx = ctxFor(kv, { now: () => at, clientIp: '1.1.1.1' });
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < LEADERBOARD_RATE_LIMIT_PER_HOUR; i += 1) {
       const r = await handlePost(baseCtx, { initials: 'RAF', score: 10, timeMs: 1000 });
       expect(r.accepted).toBe(true);
     }

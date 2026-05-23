@@ -305,10 +305,13 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
         return 'Try different initials';
       case 'rate_limited': {
         if (typeof retryAfterSeconds === 'number') {
-          const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
-          return `Too many recent submissions; try again in ${minutes} min`;
+          if (retryAfterSeconds < 60) {
+            return `Sorry — wait ${Math.max(1, Math.ceil(retryAfterSeconds))} s to submit more high scores`;
+          }
+          const minutes = Math.ceil(retryAfterSeconds / 60);
+          return `Sorry — wait ${minutes} min to submit more high scores`;
         }
-        return 'Too many recent submissions; try again later';
+        return 'Sorry — try again later to submit more high scores';
       }
       case 'storage_unavailable':
         return 'Submission failed. Try again later';
