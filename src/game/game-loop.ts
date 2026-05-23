@@ -537,8 +537,14 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // ---- DOM event bridging ----
 
   function onKeyDown(event: KeyboardEvent): void {
-    // Mute toggle is global — works in every loop state regardless of any
-    // modal being open.
+    // Submission form owns the keyboard completely while open — its own
+    // capture-phase listener handles Enter (submit) and Escape (skip);
+    // every OTHER keystroke must land in the initials <input> with no
+    // side effect on the game-loop (typing "M" must not toggle mute,
+    // typing any letter must not trigger restart, etc.).
+    if (submissionForm.isOpen()) return;
+    // Mute toggle is global outside the submission form — works in every
+    // other loop state regardless of any modal being open.
     if (event.key === 'm' || event.key === 'M') {
       audioEngine.setMuted(!audioEngine.isMuted());
       muteButton.setMuted(audioEngine.isMuted());
