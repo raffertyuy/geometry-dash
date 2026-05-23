@@ -38,6 +38,24 @@ You have standing permission to evolve the dev environment when it helps the wor
 
 Still narrate what you're changing and why, and roll changes back if they don't earn their keep.
 
+## Public repo / secrets policy
+
+This codebase is published to a **public GitHub repo** (`raffertyuy/geometry-dash`). Everything checked in is world-readable. Before committing, audit for accidental secrets.
+
+**Safe to commit** (per Cloudflare's own published examples — these are identifiers, not credentials):
+
+- Cloudflare KV namespace IDs, D1 database IDs, R2 bucket names, Queue names.
+- Worker name, binding names, route patterns, custom domain (`trgd.raztype.com`).
+- Cloudflare account ID — technically non-sensitive but keep it OUT of the repo as a defence-in-depth measure; let `wrangler` pick it up from the local session or CI env.
+
+**Never commit — must live in Cloudflare Worker secrets or GitHub Actions secrets**:
+
+- Cloudflare API tokens (`CLOUDFLARE_API_TOKEN`) → GitHub repo settings → Secrets and variables → Actions, for any CI-driven `wrangler deploy`.
+- HMAC / JWT signing keys, OAuth client secrets, third-party API keys, DB passwords, encryption keys → `wrangler secret put NAME` (or dashboard → Worker → Settings → Variables → Encrypt) so they're available as `env.NAME` at runtime but never in source.
+- Anything in a `.env*` file that isn't `.env.example`. The repo's `.gitignore` should ignore real `.env*`; only `.env.example` (with dummy values) is committable.
+
+**When introducing a new feature that needs a secret**: surface it in the slice's `spec.md` / `plan.md`, list the required secret names + where they live (Worker secret vs. GitHub Actions secret), and document the bootstrap step in `quickstart.md` so a fresh contributor can run the project. Never paste real values into Spec Kit artifacts — even committed plans go public.
+
 ## Project rules
 
 The project **constitution** lives at `.specify/memory/constitution.md` and is binding. Summary of v1.0.0:
