@@ -21,6 +21,7 @@ A 3D, Tron-themed, Subway-Surfers-style endless runner where the obstacle field 
 - **How-to-Play modal + Pause button**: the old "Problem credits" link on the start and game-over screens is now a "How to Play" button that opens a three-section tutorial modal — General Rules, Problem Cubes (a difficulty-by-difficulty reference with colour swatches, point values, and countdown durations), and Credits (the CC-BY attribution list moves here, no regression). During a run a Pause button (⏸) is rendered at the top of the screen; tapping it or pressing ESC / SPACE pauses the world and opens the same modal in pause-mode. Closing the modal (X / ESC / SPACE) resumes the run from the exact tick it was paused at. The Pause button auto-disables while a problem-gate modal is open or while the runner is in respawn invincibility, so it can't be used to dodge a question or a near-miss.
 - **Score floors at zero; only zero lives ends the run**: a wrong answer still costs the difficulty's points and one life, but if those points would drive the running score below zero the score simply clamps back to zero and the run continues. The single end-of-run condition is now zero lives; the previous "score below zero" terminal rule has been retired because it punished early-game wrong answers far too aggressively. The lives HUD is pushed eagerly on the answer-resolve callback so the heart deduction is always visible, even when the same answer takes the run to zero lives.
 - **Audio (slice 009)**: a looping default BGM during running, plus a tense math-contest theme that swaps in while a problem-gate modal is open (and swaps back when you close it). Procedural SFX for lane changes, obstacle hits, correct answers, life losses, the countdown's last 10 seconds, and game-over; the gate-hit cue is a real sampled power-up file. A HUD mute button (top-right) or the `M` key silences everything in one tap; mute is a master-gain switch so un-muting picks up exactly where the music would have been. **The mute toggle and the modal's auto-continue checkbox both persist in `localStorage`** so the player's choices survive a page reload. First user gesture unlocks audio so mobile autoplay is respected (the start screen uses a two-step entry — first tap primes audio + plays BGM, second tap begins the run); pause-button / blur fully suspends audio.
+- **Global leaderboard (slice 010)**: a top-20 global board powered by a Cloudflare Worker + a single JSON blob in Cloudflare KV (no SQL, no schema migrations). The start screen and game-over screen render the live top 20 with rank / initials / score / time / date, falling back to "Leaderboard offline" if the backend is unreachable. When your run cracks the cutoff, a modal opens for 3-letter arcade-style initials (defaulting to your last-used initials, persisted in `localStorage`), Submit or Skip. Anti-abuse for v1 is intentionally light: server-side payload validation, a time-derived score plausibility bound, a fixed-window per-IP rate limit, and a small embedded profanity wordlist — no HMAC signing yet, though the endpoint shape stays forward-compatible for that upgrade. Your **personal best is tracked per-device** and shown pinned above the table if it isn't in the global top 20, or highlighted inside the table if it is.
 
 ## Getting started
 
@@ -48,9 +49,10 @@ Append `?debug=1` to the URL to see a small overlay with the current run state, 
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Vite dev server with hot module reload. |
-| `npm run preview` | Serve the production `dist/` locally — catches "works in dev, breaks in build" issues. |
-| `npm run build` | Production build to `dist/` (~140 KB gzipped JS at the time of writing). |
+| `npm run dev` | Vite dev server with hot module reload — client-only iteration. The leaderboard panel shows "Leaderboard offline" because the Worker isn't running, which is the same behaviour as a real backend outage. |
+| `npm run dev:worker` | `wrangler dev` — runs the Cloudflare Worker locally (with an in-memory KV by default) and serves the built `dist/` alongside it. Requires `npm run build` first. |
+| `npm run preview` | Serve the production `dist/` locally via Vite — catches "works in dev, breaks in build" issues. |
+| `npm run build` | Production build to `dist/` (~168 KB gzipped JS at the time of writing). |
 | `npm test` | Run all unit + integration tests once (Vitest, node environment). |
 | `npm run test:watch` | Same, in watch mode. |
 | `npm run test:coverage` | Tests plus a V8 coverage report. |
@@ -74,7 +76,11 @@ geometry-dash/
 │   ├── 003-obstacles/                 Random geometric obstacles + game-over + restart
 │   ├── 004-difficulty-escalation/     Every-30s speed and scoring escalation
 │   ├── 005-problem-gates/             Problem-gate cubes + answer modal + lives system
-│   └── 006-geometry-problems/         Real geometry problems + SVG diagrams + credits
+│   ├── 006-geometry-problems/         Real geometry problems + SVG diagrams + credits
+│   ├── 007-problem-timer/             Per-question countdown timer + urgency cue
+│   ├── 008-how-to-play/               How-to-Play modal + pause button + score-floor rule
+│   ├── 009-audio/                     Web Audio engine + dual BGM + procedural SFX + mute
+│   └── 010-leaderboard/               Cloudflare Worker + KV global top-20 + submission flow + personal best
 ├── src/
 │   ├── shared/                        Types + tunable constants (Lane, RunState, LANE_X, …)
 │   ├── lane-state/                    Pure logic: 3-lane state machine + animation
@@ -86,9 +92,13 @@ geometry-dash/
 │   ├── problem-gates/                 Pure logic: gate spawn state + catalogue + collision
 │   ├── problems/                      Pure logic: Basic problem pool + Medium/Advanced templates + sources
 │   ├── diagrams/                      Pure logic: SVG primitives + parameterised archetypes
-│   ├── renderer/                      Three.js scene + DOM overlays (modal, credits panel, HUD, debug)
+│   ├── audio/                         Web Audio engine + procedural SFX synths + dual BGM
+│   ├── leaderboard/                   Pure logic: fetch + submit client + gate predicate + personal-best derivation + localStorage adapter
+│   ├── worker/                        Cloudflare Worker (KV-backed leaderboard backend)
+│   ├── renderer/                      Three.js scene + DOM overlays (modal, credits panel, HUD, debug, leaderboard, submission form)
 │   ├── game/                          Integration glue: rAF loop, DOM event bridging, state machine
 │   └── main.ts                        Entry point
+├── wrangler.toml                      Cloudflare Workers + Static Assets config (KV binding + dist/)
 ├── tests/
 │   └── integration/                   Cross-module flow tests
 ├── index.html                         Canvas + DOM overlays (start, pause, game-over, HUD)
@@ -147,8 +157,8 @@ The binding rules live in `.specify/memory/constitution.md`. Short summary:
 - **3D rendering**: Three.js 0.184, with `EffectComposer` + `UnrealBloomPass` (for the Tron glow) and `LineSegments2` (for thick glowing obstacle outlines)
 - **Tests**: Vitest 2 (node environment for pure modules, jsdom override available for renderer tests)
 - **Linter**: ESLint 9 (flat config) + `typescript-eslint`, enforcing the import-boundary rule
-- **Hosting target**: Cloudflare Pages (static deploy from `dist/`)
-- **Backend**: none — game runs entirely in the browser; no accounts, no persistence yet
+- **Hosting target**: Cloudflare Workers + Static Assets (via `wrangler.toml`, deploys `dist/` as static assets alongside the Worker)
+- **Backend**: a single Cloudflare Worker at `src/worker/index.ts` exposing `GET` / `POST /api/leaderboard`; data stored in one JSON blob in Cloudflare KV. No accounts, no sign-in; per-device personal best lives in `localStorage`.
 
 ## Useful Spec Kit links
 
