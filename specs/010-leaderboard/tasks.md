@@ -192,7 +192,7 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
 
 ### Tests for US3
 
-- [ ] T042 [P] [US3] Create `src/leaderboard/personal-best.test.ts` per [contracts/module-contracts.md §4](./contracts/module-contracts.md):
+- [X] T042 [P] [US3] Create `src/leaderboard/personal-best.test.ts` per [contracts/module-contracts.md §4](./contracts/module-contracts.md):
   - `shouldUpdatePersonalBest(null, ...)` → true.
   - `shouldUpdatePersonalBest(currentLower, ...)` → true.
   - `shouldUpdatePersonalBest(currentEqual, ...)` → false (ties don't update).
@@ -204,9 +204,9 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
 
 ### Implementation for US3
 
-- [ ] T043 [P] [US3] Create `src/leaderboard/personal-best.ts` per [contracts/module-contracts.md §4](./contracts/module-contracts.md). Pure functions.
-- [ ] T044 [US3] Update `src/leaderboard/index.ts` to re-export `shouldUpdatePersonalBest` + `derivePersonalBestSurface`.
-- [ ] T045 [US3] Update `src/game/game-loop.ts`:
+- [X] T043 [P] [US3] Create `src/leaderboard/personal-best.ts` per [contracts/module-contracts.md §4](./contracts/module-contracts.md). Pure functions.
+- [X] T044 [US3] Update `src/leaderboard/index.ts` to re-export `shouldUpdatePersonalBest` + `derivePersonalBestSurface`.
+- [X] T045 [US3] Update `src/game/game-loop.ts`:
   - Track `personalBest: PersonalBest | null = leaderboardStorage.getPersonalBest()` at construction.
   - On run end (BEFORE the existing submission-prompt branch): if `shouldUpdatePersonalBest(personalBest, runScore, runTimeMs)`, update `personalBest = { score: runScore, timeMs: runTimeMs, achievedAt: new Date().toISOString() }`, call `leaderboardStorage.setPersonalBest(personalBest)`, emit `leaderboard_personal_best_updated`.
   - When rendering the panel snapshot anywhere, compute `personalBestSurface = derivePersonalBestSurface(currentBoard, personalBest, leaderboardStorage.getLastInitials())` and pass it into `leaderboardPanel.render({ fetch, personalBestSurface })`. Replace the temporary `{ kind: 'absent' }` from T040 with this derivation everywhere.

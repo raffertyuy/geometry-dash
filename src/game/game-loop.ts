@@ -55,10 +55,13 @@ import { createAudioEngine, type AudioEngine } from '../audio';
 import {
   createLeaderboardClient,
   createLeaderboardStorage,
+  derivePersonalBestSurface,
   shouldPromptForSubmission,
+  shouldUpdatePersonalBest,
   type FetchStatus,
   type LeaderboardClient,
   type LeaderboardStorage,
+  type PersonalBest,
 } from '../leaderboard';
 import type {
   LeaderboardEntry,
@@ -259,10 +262,17 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   let currentBoard: readonly LeaderboardEntry[] = [];
   let fetchStatus: FetchStatus = { kind: 'idle' };
   let lastSubmitOutcome: string | null = null;
+  let personalBest: PersonalBest | null = leaderboardStorage.getPersonalBest();
 
   function panelSnapshot(): LeaderboardPanelSnapshot {
-    // PB surface lands in slice 010 phase 5 (US3). For now always absent.
-    return { fetch: fetchStatus, personalBestSurface: { kind: 'absent' } };
+    return {
+      fetch: fetchStatus,
+      personalBestSurface: derivePersonalBestSurface(
+        currentBoard,
+        personalBest,
+        leaderboardStorage.getLastInitials(),
+      ),
+    };
   }
   function renderLeaderboardPanel(): void {
     leaderboardPanel.render(panelSnapshot());
@@ -411,12 +421,30 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     showGameOverOverlay(true);
     // Refresh the leaderboard so the game-over screen shows the live board.
     showLeaderboardPanel(true);
+    // Persist personal best BEFORE refreshing the panel so the derivation
+    // sees the up-to-date PB. The PB is per-device and updates on any new
+    // high regardless of whether the run cracked the global board.
+    const runScore = computeScore(world.tickMs, world.scoreDelta);
+    const runTimeMs = Math.max(0, Math.floor(world.tickMs));
+    const flooredRunScore = Math.max(0, Math.floor(runScore));
+    if (shouldUpdatePersonalBest(personalBest, flooredRunScore, runTimeMs)) {
+      personalBest = {
+        score: flooredRunScore,
+        timeMs: runTimeMs,
+        achievedAt: new Date().toISOString(),
+      };
+      leaderboardStorage.setPersonalBest(personalBest);
+      console.debug({
+        event: 'leaderboard_personal_best_updated',
+        score: personalBest.score,
+        timeMs: personalBest.timeMs,
+      });
+    }
     void refreshLeaderboard();
     // Open the submission form if the run cracked the cached top 20. The
     // server will revalidate, so a stale board here is safe — at worst the
     // submission is silently accepted without writing.
-    const runScore = computeScore(world.tickMs, world.scoreDelta);
-    if (runScore > 0 && shouldPromptForSubmission(currentBoard, Math.floor(runScore))) {
+    if (runScore > 0 && shouldPromptForSubmission(currentBoard, flooredRunScore)) {
       submissionForm.open(leaderboardStorage.getLastInitials());
     }
   }
