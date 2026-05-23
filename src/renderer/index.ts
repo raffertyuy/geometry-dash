@@ -11,4 +11,9 @@ export {
   type LeaderboardPanel,
   type LeaderboardPanelSnapshot,
 } from './leaderboard-panel';
+export {
+  createSubmissionForm,
+  type SubmissionForm,
+  type SubmissionFormHandlers,
+} from './submission-form';
 export { mathText } from './math-text';

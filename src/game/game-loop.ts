@@ -37,6 +37,7 @@ import {
   createMuteButton,
   createPauseButton,
   createProblemModal,
+  createSubmissionForm,
   createThreeRenderer,
   type DebugOverlay,
   type FloatingScore,
@@ -47,17 +48,22 @@ import {
   type MuteButton,
   type PauseButton,
   type ProblemModal,
+  type SubmissionForm,
   type ThreeRenderer,
 } from '../renderer';
 import { createAudioEngine, type AudioEngine } from '../audio';
 import {
   createLeaderboardClient,
   createLeaderboardStorage,
+  shouldPromptForSubmission,
   type FetchStatus,
   type LeaderboardClient,
   type LeaderboardStorage,
 } from '../leaderboard';
-import type { LeaderboardEntry } from '../shared/leaderboard-types';
+import type {
+  LeaderboardEntry,
+  SubmissionErrorCode,
+} from '../shared/leaderboard-types';
 import { computeScore, formatScore, formatTimer } from '../score';
 import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type {
@@ -252,6 +258,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   const leaderboardPanel: LeaderboardPanel = createLeaderboardPanel(host.leaderboardPanel);
   let currentBoard: readonly LeaderboardEntry[] = [];
   let fetchStatus: FetchStatus = { kind: 'idle' };
+  let lastSubmitOutcome: string | null = null;
 
   function panelSnapshot(): LeaderboardPanelSnapshot {
     // PB surface lands in slice 010 phase 5 (US3). For now always absent.
@@ -276,10 +283,69 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     renderLeaderboardPanel();
   }
 
-  // Silence "declared but never used" until slice-010 phase 4 / 5 wire
-  // these in. Pure readbacks; no behavioural side-effects.
-  void leaderboardStorage;
-  void currentBoard;
+  // Submission form (US2). Opens on game-over when shouldPromptForSubmission
+  // returns true. onSubmit posts to the worker; onSkip closes silently.
+  function messageForCode(error: SubmissionErrorCode, retryAfterSeconds?: number): string {
+    switch (error) {
+      case 'invalid_payload':
+        return 'Submission could not be verified';
+      case 'implausible_score':
+        return 'Submission could not be verified';
+      case 'profanity':
+        return 'Try different initials';
+      case 'rate_limited': {
+        if (typeof retryAfterSeconds === 'number') {
+          const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+          return `Too many recent submissions; try again in ${minutes} min`;
+        }
+        return 'Too many recent submissions; try again later';
+      }
+      case 'storage_unavailable':
+        return 'Submission failed. Try again later';
+      default:
+        return 'Submission failed';
+    }
+  }
+
+  async function onSubmissionFormSubmit(initials: string): Promise<void> {
+    console.debug({ event: 'leaderboard_submit_attempted', initials });
+    submissionForm.setSubmitting(true);
+    submissionForm.setError(null);
+    leaderboardStorage.setLastInitials(initials);
+    const runScore = computeScore(world.tickMs, world.scoreDelta);
+    const runTimeMs = Math.max(0, Math.floor(world.tickMs));
+    const response = await leaderboardClient.submitScore({
+      initials,
+      score: Math.max(0, Math.floor(runScore)),
+      timeMs: runTimeMs,
+    });
+    if (response.accepted) {
+      console.debug({ event: 'leaderboard_submit_accepted_by_game', count: response.entries.length });
+      currentBoard = response.entries;
+      fetchStatus = { kind: 'success', entries: response.entries };
+      lastSubmitOutcome = 'accepted';
+      renderLeaderboardPanel();
+      submissionForm.close();
+    } else {
+      console.debug({ event: 'leaderboard_submit_rejected_by_game', code: response.error });
+      lastSubmitOutcome = `rejected:${response.error}`;
+      submissionForm.setSubmitting(false);
+      submissionForm.setError(messageForCode(response.error, response.retryAfterSeconds));
+    }
+  }
+
+  function onSubmissionFormSkip(): void {
+    console.debug({ event: 'leaderboard_submit_skipped' });
+    lastSubmitOutcome = 'skipped';
+    submissionForm.close();
+  }
+
+  const submissionForm: SubmissionForm = createSubmissionForm(host.submissionForm, {
+    onSubmit: (initials) => {
+      void onSubmissionFormSubmit(initials);
+    },
+    onSkip: onSubmissionFormSkip,
+  });
   function showLeaderboardPanel(visible: boolean): void {
     leaderboardPanel.setHostVisibility(visible);
   }
@@ -344,13 +410,20 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     host.gameOverTimer.textContent = formatTimer(world.tickMs);
     showGameOverOverlay(true);
     // Refresh the leaderboard so the game-over screen shows the live board.
-    // Submission-form opening lands in slice 010 phase 4 (US2).
     showLeaderboardPanel(true);
     void refreshLeaderboard();
+    // Open the submission form if the run cracked the cached top 20. The
+    // server will revalidate, so a stale board here is safe — at worst the
+    // submission is silently accepted without writing.
+    const runScore = computeScore(world.tickMs, world.scoreDelta);
+    if (runScore > 0 && shouldPromptForSubmission(currentBoard, Math.floor(runScore))) {
+      submissionForm.open(leaderboardStorage.getLastInitials());
+    }
   }
 
   function restartFromInput(): void {
     showLeaderboardPanel(false);
+    submissionForm.close();
     world = restartRun(world);
     player = createPlayerState();
     obstacles = [];
@@ -695,7 +768,12 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     renderer.updateObstacles(obstacles);
     renderer.updateGates(gates, world.tickMs);
     renderer.draw(player, world);
-    debugOverlay.update(player, world, lastInput, problemModal.getDebugSnapshot());
+    debugOverlay.update(player, world, lastInput, problemModal.getDebugSnapshot(), {
+      fetch: fetchStatus.kind,
+      entries: fetchStatus.kind === 'success' ? fetchStatus.entries.length : 0,
+      personalBest: leaderboardStorage.getPersonalBest()?.score ?? null,
+      lastSubmit: lastSubmitOutcome,
+    });
     livesHud.set(world.lives);
     const pbState = derivePauseButtonState(loopState, world, howToPlayModal.isVisible());
     pauseButton.setVisible(pbState.visible);
@@ -729,6 +807,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     pauseButton.destroy();
     muteButton.destroy();
     leaderboardPanel.destroy();
+    submissionForm.destroy();
     audioEngine.destroy();
     problemModal.destroy();
     floatingScore.destroy();

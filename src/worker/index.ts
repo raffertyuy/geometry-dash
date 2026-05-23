@@ -1,5 +1,6 @@
+import { handleGet, handlePost, type HandlerContext } from './handlers';
 import { createKVAdapter } from './kv-adapter';
-import type { LeaderboardEntry, LeaderboardResponse } from '../shared/leaderboard-types';
+import type { SubmissionResponse } from '../shared/leaderboard-types';
 
 /** Worker runtime bindings declared in wrangler.toml. */
 export interface WorkerEnv {
@@ -14,19 +15,43 @@ export interface WorkerEnv {
   readonly SIGNING_KEY?: string;
 }
 
-/** The KV-persisted shape — a versioned wrapper around the entries array. */
-interface StoredBoard {
-  readonly version: 1;
-  readonly entries: readonly LeaderboardEntry[];
-}
-
-const KV_KEY_TOP20 = 'top20' as const;
-
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8' },
   });
+}
+
+function statusForSubmission(response: SubmissionResponse): number {
+  if (response.accepted) return 200;
+  switch (response.error) {
+    case 'invalid_payload':
+    case 'profanity':
+    case 'implausible_score':
+      return 400;
+    case 'rate_limited':
+      return 429;
+    case 'storage_unavailable':
+      return 503;
+    default:
+      return 500;
+  }
+}
+
+function logRequest(
+  method: string,
+  pathname: string,
+  ip: string | null,
+  outcome: string,
+): void {
+  // Truncate the IP for logging: keep first three octets, redact the last.
+  // (Best-effort obfuscation; the real audit comes from Cloudflare's edge logs.)
+  let ipHash = '-';
+  if (ip) {
+    const parts = ip.split('.');
+    ipHash = parts.length === 4 ? `${parts.slice(0, 3).join('.')}.x` : 'ipv6';
+  }
+  console.log(JSON.stringify({ event: 'leaderboard_request', method, pathname, ip: ipHash, outcome }));
 }
 
 const worker: ExportedHandler<WorkerEnv> = {
@@ -35,40 +60,57 @@ const worker: ExportedHandler<WorkerEnv> = {
 
     if (url.pathname === '/api/leaderboard') {
       const kv = createKVAdapter(env.LEADERBOARD);
+      const ctx: HandlerContext =
+        env.SIGNING_KEY !== undefined
+          ? {
+              kv,
+              now: () => new Date(),
+              clientIp: request.headers.get('CF-Connecting-IP'),
+              signingKey: env.SIGNING_KEY,
+            }
+          : {
+              kv,
+              now: () => new Date(),
+              clientIp: request.headers.get('CF-Connecting-IP'),
+            };
 
-      if (request.method === 'GET') {
-        try {
-          const stored = await kv.get<StoredBoard>(KV_KEY_TOP20);
-          const entries = stored?.entries ?? [];
-          const body: LeaderboardResponse = { entries };
-          console.log(JSON.stringify({ event: 'leaderboard_get', count: entries.length }));
+      try {
+        if (request.method === 'GET') {
+          const body = await handleGet(ctx);
+          logRequest('GET', url.pathname, ctx.clientIp, `ok:${body.entries.length}`);
           return jsonResponse(200, body);
-        } catch (err) {
-          console.log(
-            JSON.stringify({
-              event: 'leaderboard_get_failed',
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          );
-          return jsonResponse(503, { error: 'storage_unavailable' });
         }
+        if (request.method === 'POST') {
+          let payload: unknown = null;
+          try {
+            payload = await request.json();
+          } catch {
+            // Fall through with payload = null → validation will reject.
+          }
+          const body = await handlePost(ctx, payload);
+          const status = statusForSubmission(body);
+          logRequest(
+            'POST',
+            url.pathname,
+            ctx.clientIp,
+            body.accepted ? `accepted:${body.entries.length}` : `rejected:${body.error}`,
+          );
+          return jsonResponse(status, body);
+        }
+        if (request.method === 'OPTIONS') {
+          return new Response(null, { status: 204 });
+        }
+        logRequest(request.method, url.pathname, ctx.clientIp, 'method_not_allowed');
+        return jsonResponse(405, { error: 'method_not_allowed' });
+      } catch (err) {
+        logRequest(
+          request.method,
+          url.pathname,
+          ctx.clientIp,
+          `internal:${err instanceof Error ? err.message : String(err)}`,
+        );
+        return jsonResponse(500, { error: 'storage_unavailable' });
       }
-
-      if (request.method === 'POST') {
-        // Placeholder until US2 wires the real submission handler. Returns
-        // a clean error so the client offline-graceful path still works.
-        console.log(JSON.stringify({ event: 'leaderboard_post_stubbed' }));
-        return jsonResponse(503, {
-          accepted: false,
-          error: 'storage_unavailable',
-        });
-      }
-
-      if (request.method === 'OPTIONS') {
-        return new Response(null, { status: 204 });
-      }
-
-      return jsonResponse(405, { error: 'method_not_allowed' });
     }
 
     // Everything else: defer to the static-assets binding.

@@ -903,16 +903,123 @@
       }
 
       /* Submission form — opens conditionally on game-over when the run
-         would crack the top 20. Hidden by default. Form-specific CSS lands
-         in slice 010 task T039 (Phase 4 / US2). */
-      #submission-form {
-        position: fixed;
+         would crack the top 20. Hidden by default. Backdrop-style overlay
+         centred on the screen so the player isn't fighting with the
+         leaderboard panel for tap-targets. */
+      .submission-form {
+        align-items: center;
+        background: rgba(15, 15, 23, 0.78);
+        backdrop-filter: blur(3px);
+        display: flex;
         inset: 0;
+        justify-content: center;
+        padding: 24px;
+        position: fixed;
+        pointer-events: auto;
+        z-index: 20;
+      }
+
+      .submission-form.hidden {
         display: none;
       }
 
-      #submission-form:not(.hidden) {
+      .submission-form__body {
+        background: rgba(8, 12, 24, 0.95);
+        border: 1px solid rgba(24, 200, 255, 0.55);
+        border-radius: 10px;
+        color: #e8e8ef;
+        max-width: 92vw;
+        padding: clamp(20px, 4vw, 32px);
+        text-align: center;
+        width: 360px;
+      }
+
+      .submission-form__heading {
+        color: #ffd86a;
+        font-size: clamp(1.2rem, 3vw, 1.6rem);
+        margin: 0 0 0.5em;
+      }
+
+      .submission-form__prompt {
+        color: #b8b8c8;
+        font-size: clamp(0.9rem, 1.8vw, 1.05rem);
+        margin: 0 0 1em;
+      }
+
+      .submission-form__input {
+        background: rgba(24, 200, 255, 0.08);
+        border: 1px solid rgba(24, 200, 255, 0.6);
+        border-radius: 6px;
+        color: #ffe18a;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: clamp(2rem, 6vw, 3rem);
+        font-weight: 700;
+        letter-spacing: 0.3em;
+        padding: 0.2em 0.4em;
+        text-align: center;
+        text-transform: uppercase;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .submission-form__input:focus {
+        border-color: #18c8ff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(24, 200, 255, 0.25);
+      }
+
+      .submission-form__error {
+        color: #d97a7a;
+        font-size: 0.9em;
+        margin: 0.8em 0 0;
+        min-height: 1.2em;
+        opacity: 0;
+        transition: opacity 120ms ease-out;
+      }
+
+      .submission-form__error--visible {
+        opacity: 1;
+      }
+
+      .submission-form__actions {
         display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 1em;
+      }
+
+      .submission-form__button {
+        appearance: none;
+        background: rgba(24, 200, 255, 0.12);
+        border: 1px solid rgba(24, 200, 255, 0.55);
+        border-radius: 6px;
+        color: #18c8ff;
+        cursor: pointer;
+        font-size: clamp(0.95rem, 2vw, 1.05rem);
+        font-weight: 600;
+        padding: 0.55em 1.5em;
+        transition: background 120ms ease-out, opacity 120ms ease-out;
+      }
+
+      .submission-form__button:hover,
+      .submission-form__button:focus-visible {
+        background: rgba(24, 200, 255, 0.24);
+        outline: none;
+      }
+
+      .submission-form__button--submit {
+        background: rgba(255, 198, 50, 0.18);
+        border-color: rgba(255, 198, 50, 0.55);
+        color: #ffe18a;
+      }
+      .submission-form__button--submit:hover,
+      .submission-form__button--submit:focus-visible {
+        background: rgba(255, 198, 50, 0.3);
+      }
+
+      .submission-form__button[disabled] {
+        cursor: not-allowed;
+        opacity: 0.4;
       }
     </style>
   </head>

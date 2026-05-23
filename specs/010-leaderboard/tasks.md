@@ -116,7 +116,7 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
 
 ### Tests for US2
 
-- [ ] T024 [P] [US2] Create `src/worker/validation.test.ts` per [contracts/module-contracts.md §9](./contracts/module-contracts.md). Cover EVERY failure mode listed in [SC-004](./spec.md):
+- [X] T024 [P] [US2] Create `src/worker/validation.test.ts` per [contracts/module-contracts.md §9](./contracts/module-contracts.md). Cover EVERY failure mode listed in [SC-004](./spec.md):
   - non-object payload → `invalid_payload`.
   - missing fields → `invalid_payload`.
   - `initials` length 0 or > 3 → `invalid_payload`.
@@ -128,16 +128,16 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
   - `score === plausibleMaxScore(timeMs)` → ok.
   - Tiny `timeMs` (e.g. 1000ms) still respects the 100k floor.
   - `signature` field present is silently ignored (v1).
-- [ ] T025 [P] [US2] Create `src/worker/profanity.test.ts`: every entry in the embedded wordlist matches case-insensitively; a few non-matches (e.g. "RAF", "AAA", "XYZ" if not in list) don't match.
-- [ ] T026 [P] [US2] Create `src/worker/rate-limit.test.ts` per [contracts/module-contracts.md §10](./contracts/module-contracts.md):
+- [X] T025 [P] [US2] Create `src/worker/profanity.test.ts`: every entry in the embedded wordlist matches case-insensitively; a few non-matches (e.g. "RAF", "AAA", "XYZ" if not in list) don't match.
+- [X] T026 [P] [US2] Create `src/worker/rate-limit.test.ts` per [contracts/module-contracts.md §10](./contracts/module-contracts.md):
   - 10 submissions in one bucket all `allowed`.
   - 11th in the same bucket `rejected` with `retryAfterSeconds > 0`.
   - First submission in the next bucket `allowed` (counter resets).
   - Different IPs don't interfere.
   - `ipAddress === null` falls back to the `"unknown"` bucket.
   - Bucket key uses `Math.floor(now/3_600_000)`.
-- [ ] T027 [P] [US2] Create `src/worker/board.test.ts`: insertion ordering, tie-break by `submittedAt` ascending, eviction at 21st entry, idempotence (re-inserting same entry doesn't duplicate when timestamps differ — it's actually expected that they differ; spec FR-021 governs ordering), `cracksTopN` truth table.
-- [ ] T028 [P] [US2] Create `src/worker/handlers.test.ts`: drive `handleGet` and `handlePost` against `createInMemoryKVAdapter()`:
+- [X] T027 [P] [US2] Create `src/worker/board.test.ts`: insertion ordering, tie-break by `submittedAt` ascending, eviction at 21st entry, idempotence (re-inserting same entry doesn't duplicate when timestamps differ — it's actually expected that they differ; spec FR-021 governs ordering), `cracksTopN` truth table.
+- [X] T028 [P] [US2] Create `src/worker/handlers.test.ts`: drive `handleGet` and `handlePost` against `createInMemoryKVAdapter()`:
   - `handleGet` empty board → `{ entries: [] }`.
   - `handleGet` populated → returns sorted entries.
   - `handlePost` validation failure → respective error code.
@@ -147,7 +147,7 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
   - `handlePost` qualifying score → `{ accepted: true, entries: nextBoard }` containing the new entry at the right rank.
   - `submittedAt` comes from `ctx.now()`.
   - Forward-compat: `signature` ignored when `signingKey` undefined.
-- [ ] T029 [P] [US2] Create `src/renderer/submission-form.test.ts` (jsdom) per [contracts/module-contracts.md §15](./contracts/module-contracts.md). Cover:
+- [X] T029 [P] [US2] Create `src/renderer/submission-form.test.ts` (jsdom) per [contracts/module-contracts.md §15](./contracts/module-contracts.md). Cover:
   - `open('AAA')` populates the input and reveals the host.
   - Typing lowercase letters auto-uppercases.
   - Non-letter keystrokes are blocked or stripped on input.
@@ -157,28 +157,28 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
   - Submit button click triggers `onSubmit`; Skip button click triggers `onSkip`.
   - `setSubmitting(true)` disables both buttons; `setSubmitting(false)` re-enables.
   - `setError(msg)` shows the message; `setError(null)` clears.
-- [ ] T030 [P] [US2] Create `tests/integration/leaderboard-flow.test.ts`. Exercise: empty board → submit → entries contains the submission → submit again with a higher score → entries contains both, sorted → submit 19 more such that the 21st would evict → eviction is the lowest score. Use the in-memory KV adapter directly.
+- [X] T030 [P] [US2] Create `tests/integration/leaderboard-flow.test.ts`. Exercise: empty board → submit → entries contains the submission → submit again with a higher score → entries contains both, sorted → submit 19 more such that the 21st would evict → eviction is the lowest score. Use the in-memory KV adapter directly.
 
 ### Implementation for US2
 
-- [ ] T031 [P] [US2] Create `src/worker/validation.ts` per [contracts/module-contracts.md §9](./contracts/module-contracts.md). Pure functions: `validateSubmission(raw)` and `plausibleMaxScore(timeMs)`.
-- [ ] T032 [P] [US2] Create `src/worker/profanity.ts`: a module-private `Set<string>` of ≤ 30 three-letter slurs/obscenities + `containsProfanity(initials: string): boolean` per [contracts/module-contracts.md §11](./contracts/module-contracts.md). Use a small list of well-known offensive 3-letter sequences (e.g. common English slurs and obvious obscenities) — keep the list tight; operators can amend later.
-- [ ] T033 [P] [US2] Create `src/worker/rate-limit.ts`: `checkAndIncrement(kv, ipAddress, now)` per [contracts/module-contracts.md §10](./contracts/module-contracts.md). Implements R4's fixed-window strategy.
-- [ ] T034 [P] [US2] Create `src/worker/board.ts`: `insertEntry`, `cracksTopN` per [contracts/module-contracts.md §12](./contracts/module-contracts.md). Pure functions; uses `LEADERBOARD_MAX_ENTRIES` for the cap.
-- [ ] T035 [US2] Create `src/worker/handlers.ts` per [contracts/module-contracts.md §8](./contracts/module-contracts.md). Pulls together `validation`, `rate-limit`, `profanity`, `board`, and the `KVAdapter`. Implements the `handleGet` + `handlePost` factories.
-- [ ] T036 [US2] Update `src/worker/index.ts`: replace the `POST → 503` placeholder with a real call to `handlers.handlePost`. Wire `clientIp = request.headers.get('CF-Connecting-IP')`, `signingKey = env.SIGNING_KEY`, `now = () => new Date()`. Map `SubmissionResponse.accepted === true` → 200; `error === 'invalid_payload' | 'profanity' | 'implausible_score'` → 400; `'rate_limited'` → 429; `'storage_unavailable'` → 503. Add a structured `console.log` per request with method + path + IP-hash + outcome.
-- [ ] T037 [P] [US2] Create `src/renderer/submission-form.ts` per [contracts/module-contracts.md §15](./contracts/module-contracts.md). Implements `open`, `close`, `setError`, `setSubmitting`, `destroy`. Keyboard handling: Enter → submit, Escape → skip.
-- [ ] T038 [US2] Update `src/renderer/index.ts` to export `createSubmissionForm` + types.
-- [ ] T039 [US2] Update `index.html` CSS for `#submission-form` and the error message: matching pause-modal palette, focus ring, mobile-keyboard-friendly input sizing.
-- [ ] T040 [US2] Update `src/game/game-loop.ts`:
+- [X] T031 [P] [US2] Create `src/worker/validation.ts` per [contracts/module-contracts.md §9](./contracts/module-contracts.md). Pure functions: `validateSubmission(raw)` and `plausibleMaxScore(timeMs)`.
+- [X] T032 [P] [US2] Create `src/worker/profanity.ts`: a module-private `Set<string>` of ≤ 30 three-letter slurs/obscenities + `containsProfanity(initials: string): boolean` per [contracts/module-contracts.md §11](./contracts/module-contracts.md). Use a small list of well-known offensive 3-letter sequences (e.g. common English slurs and obvious obscenities) — keep the list tight; operators can amend later.
+- [X] T033 [P] [US2] Create `src/worker/rate-limit.ts`: `checkAndIncrement(kv, ipAddress, now)` per [contracts/module-contracts.md §10](./contracts/module-contracts.md). Implements R4's fixed-window strategy.
+- [X] T034 [P] [US2] Create `src/worker/board.ts`: `insertEntry`, `cracksTopN` per [contracts/module-contracts.md §12](./contracts/module-contracts.md). Pure functions; uses `LEADERBOARD_MAX_ENTRIES` for the cap.
+- [X] T035 [US2] Create `src/worker/handlers.ts` per [contracts/module-contracts.md §8](./contracts/module-contracts.md). Pulls together `validation`, `rate-limit`, `profanity`, `board`, and the `KVAdapter`. Implements the `handleGet` + `handlePost` factories.
+- [X] T036 [US2] Update `src/worker/index.ts`: replace the `POST → 503` placeholder with a real call to `handlers.handlePost`. Wire `clientIp = request.headers.get('CF-Connecting-IP')`, `signingKey = env.SIGNING_KEY`, `now = () => new Date()`. Map `SubmissionResponse.accepted === true` → 200; `error === 'invalid_payload' | 'profanity' | 'implausible_score'` → 400; `'rate_limited'` → 429; `'storage_unavailable'` → 503. Add a structured `console.log` per request with method + path + IP-hash + outcome.
+- [X] T037 [P] [US2] Create `src/renderer/submission-form.ts` per [contracts/module-contracts.md §15](./contracts/module-contracts.md). Implements `open`, `close`, `setError`, `setSubmitting`, `destroy`. Keyboard handling: Enter → submit, Escape → skip.
+- [X] T038 [US2] Update `src/renderer/index.ts` to export `createSubmissionForm` + types.
+- [X] T039 [US2] Update `index.html` CSS for `#submission-form` and the error message: matching pause-modal palette, focus ring, mobile-keyboard-friendly input sizing.
+- [X] T040 [US2] Update `src/game/game-loop.ts`:
   - Construct `submissionForm = createSubmissionForm(host.submissionForm, { onSubmit, onSkip })`.
   - On run end (after the existing game-over transitions): compute `runScore` from the score module + `runTimeMs` from the score module's elapsed value. If `shouldPromptForSubmission(currentBoard, runScore)` is true, `submissionForm.open(leaderboardStorage.getLastInitials())`.
   - `onSubmit(initials)`: `submissionForm.setSubmitting(true)`; `submissionForm.setError(null)`; persist `setLastInitials(initials)`; call `client.submitScore({ initials, score: runScore, timeMs: runTimeMs })`. On `accepted: true`, `submissionForm.close()`, replace `currentBoard = response.entries`, re-derive panel snapshot (PB derivation arrives in US3; for now `personalBestSurface = { kind: 'absent' }`), re-render. On rejected, `submissionForm.setSubmitting(false)` and `submissionForm.setError(messageForCode(error, retryAfterSeconds))`.
   - `onSkip`: `submissionForm.close()`. No state change.
   - Add `submissionForm.close()` to the run-restart path so a fresh run doesn't see a stale form.
   - `messageForCode` is a small pure helper colocated in `src/game/game-loop.ts` mapping each `SubmissionErrorCode` to the user-facing copy from [contracts/api.md](./contracts/api.md) + the rate-limit cool-down message ("Try again in {N} minutes").
-- [ ] T041 [US2] Append `console.debug` instrumentation in `game-loop.ts`: `leaderboard_submit_attempted`, `leaderboard_submit_accepted`, `leaderboard_submit_rejected` (with code). The client `submitScore` already emits its own events; these add the loop-level outcome.
-- [ ] T041a [US2] Extend the existing debug overlay (the one gated by `?debug=1`, currently in `src/renderer/debug-overlay.ts` or equivalent — locate via `Grep` for the existing overlay implementation) with a single leaderboard-status line per FR-027. Format: `Leaderboard: {fetchStatus.kind} · {entries.length} entries · PB {pb?.score ?? 'none'} · Last submit {lastSubmitOutcome ?? '—'}`. The line refreshes whenever the panel snapshot updates. If the existing overlay does not yet exist as a discrete module, add the new line wherever the `?debug=1`-gated text is rendered.
+- [X] T041 [US2] Append `console.debug` instrumentation in `game-loop.ts`: `leaderboard_submit_attempted`, `leaderboard_submit_accepted`, `leaderboard_submit_rejected` (with code). The client `submitScore` already emits its own events; these add the loop-level outcome.
+- [X] T041a [US2] Extend the existing debug overlay (the one gated by `?debug=1`, currently in `src/renderer/debug-overlay.ts` or equivalent — locate via `Grep` for the existing overlay implementation) with a single leaderboard-status line per FR-027. Format: `Leaderboard: {fetchStatus.kind} · {entries.length} entries · PB {pb?.score ?? 'none'} · Last submit {lastSubmitOutcome ?? '—'}`. The line refreshes whenever the panel snapshot updates. If the existing overlay does not yet exist as a discrete module, add the new line wherever the `?debug=1`-gated text is rendered.
 
 **Checkpoint**: US2 is independently testable. A qualifying run shows the form; submission updates the board; the new row appears highlighted (via the same client-side highlight path the panel already supports for the personal-best surface). All abuse vectors return their expected error codes.
 
