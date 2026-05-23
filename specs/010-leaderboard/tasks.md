@@ -28,11 +28,11 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
 
 **Purpose**: Bring the new Worker target into the build / typecheck / lint pipelines without changing runtime behaviour yet.
 
-- [ ] T001 Append `.wrangler/` and `.dev.vars` to `.gitignore` per [research.md §R12](./research.md).
-- [ ] T002 [P] Update `package.json`: add `wrangler@^3` and `@cloudflare/workers-types@^4` to `devDependencies`; add a new script `"dev:worker": "wrangler dev"`. Run `npm install` to refresh the lockfile and stage both `package.json` and `package-lock.json` together in this task's commit.
-- [ ] T003 [P] Create `wrangler.toml` at repo root per [contracts/module-contracts.md §21](./contracts/module-contracts.md). Declare `name = "geometry-dash"`, `main = "src/worker/index.ts"`, a recent `compatibility_date`, the `[assets] directory = "./dist"` + `binding = "ASSETS"`, and the `[[kv_namespaces]]` entry with `binding = "LEADERBOARD"` and `id = "935b139cc04047bf9ecff5207fe264bc"`. The namespace ID is non-sensitive per Cloudflare's published examples and is safe to commit per the project's public-repo / secrets policy in `CLAUDE.md`.
-- [ ] T004 [P] Update `tsconfig.json` to add `"@cloudflare/workers-types"` to the `types` array (append to any existing list; don't replace). Verify `npm run typecheck` still passes after this and T002.
-- [ ] T005 [P] Update `eslint.config.js` to extend the existing library-boundary rule: `src/worker/*` MAY import from `src/shared/*` and from its own folder; MUST NOT import from `src/renderer/*`, `src/game/*`, `three`, or any other DOM-facing module. Mirror the existing pattern that forbids non-`renderer`/`game` modules from importing `three`.
+- [X] T001 Append `.wrangler/` and `.dev.vars` to `.gitignore` per [research.md §R12](./research.md).
+- [X] T002 [P] Update `package.json`: add `wrangler@^3` and `@cloudflare/workers-types@^4` to `devDependencies`; add a new script `"dev:worker": "wrangler dev"`. Run `npm install` to refresh the lockfile and stage both `package.json` and `package-lock.json` together in this task's commit.
+- [X] T003 [P] Create `wrangler.toml` at repo root per [contracts/module-contracts.md §21](./contracts/module-contracts.md). Declare `name = "geometry-dash"`, `main = "src/worker/index.ts"`, a recent `compatibility_date`, the `[assets] directory = "./dist"` + `binding = "ASSETS"`, and the `[[kv_namespaces]]` entry with `binding = "LEADERBOARD"` and `id = "935b139cc04047bf9ecff5207fe264bc"`. The namespace ID is non-sensitive per Cloudflare's published examples and is safe to commit per the project's public-repo / secrets policy in `CLAUDE.md`.
+- [X] T004 [P] Update `tsconfig.json` to add `"@cloudflare/workers-types"` to the `types` array (append to any existing list; don't replace). Verify `npm run typecheck` still passes after this and T002.
+- [X] T005 [P] Update `eslint.config.js` to extend the existing library-boundary rule: `src/worker/*` MAY import from `src/shared/*` and from its own folder; MUST NOT import from `src/renderer/*`, `src/game/*`, `three`, or any other DOM-facing module. Mirror the existing pattern that forbids non-`renderer`/`game` modules from importing `three`.
 
 ---
 

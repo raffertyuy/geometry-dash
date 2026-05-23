@@ -1,0 +1,17 @@
+name = "geometry-dash"
+main = "src/worker/index.ts"
+compatibility_date = "2026-05-23"
+
+# Static assets binding: serves the Vite-built `dist/` from the same Worker.
+# Requests that the Worker doesn't route under /api/* fall through to here.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+# KV namespace for the global leaderboard. The namespace ID below is
+# non-sensitive per Cloudflare's published examples and is safe to commit
+# in a public repo. Future Worker secrets (e.g. SIGNING_KEY) MUST be set
+# via `wrangler secret put` and never appear in this file.
+[[kv_namespaces]]
+binding = "LEADERBOARD"
+id = "935b139cc04047bf9ecff5207fe264bc"
