@@ -64,16 +64,18 @@ describe('derivePersonalBestSurface', () => {
     }
   });
 
-  it('returns pinned when PB score matches an entry but initials differ', () => {
+  it('returns highlighted when (score, timeMs) match — even if initials differ', () => {
+    // Player previously submitted as 'OTH', set a PB, then changed to 'RAF'.
+    // The board still has the OTH entry; the player IS represented by that
+    // row, so we highlight it rather than pin a confusing duplicate.
     const board: LeaderboardEntry[] = [entry(100, 'OTH')];
     const result = derivePersonalBestSurface(board, pb(100), 'RAF');
-    expect(result.kind).toBe('pinned');
-    if (result.kind === 'pinned') {
-      expect(result.entry.initials).toBe('RAF');
-    }
+    expect(result).toEqual({ kind: 'highlighted', atIndex: 0 });
   });
 
-  it('returns pinned when PB score+initials match but timeMs differs', () => {
+  it('returns pinned when score matches an entry but timeMs differs', () => {
+    // Coincidental same-score from a faster / slower run — the player's
+    // best is not represented on the board.
     const board: LeaderboardEntry[] = [entry(100, 'RAF', 5000)];
     const result = derivePersonalBestSurface(board, pb(100, 9999), 'RAF');
     expect(result.kind).toBe('pinned');

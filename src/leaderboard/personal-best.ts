@@ -19,15 +19,22 @@ export function shouldUpdatePersonalBest(
  * Decide how to surface the personal best alongside the global board.
  *
  *   - 'absent'      → no PB recorded yet (first-time player on this device).
- *   - 'highlighted' → PB matches an entry in the board AND that entry's
- *                     initials match the player's last-used initials.
- *   - 'pinned'      → PB exists but is not visible in the top-N (or the
- *                     initials don't match a top-N entry); render a
- *                     separate "Your best" row above the board.
+ *   - 'highlighted' → PB matches an entry in the board on (score, timeMs).
+ *                     We highlight the matching row regardless of its
+ *                     initials — the player IS represented there, even
+ *                     if they've changed initials since submitting that run.
+ *   - 'pinned'      → PB exists but is NOT represented in the top-N at
+ *                     all (run was never submitted, or it was evicted).
+ *                     Render a separate "Your best" row above the board.
  *
- * The (initials, score, timeMs) triple is the highlight key. If the player
- * has been changing initials each run, only the most-recent submitted run
- * shows as "yours" — intentional, per data-model §2.
+ * The match key is (score, timeMs) only — NOT initials. Earlier iterations
+ * required all three to match, but that produced a confusing duplicate row
+ * whenever the player switched initials between PB-setting and viewing
+ * (the pinned row would carry the new initials with the PB's score, sitting
+ * directly above the actual same-numbers entry under the old initials).
+ * (score, timeMs) is specific enough in practice to avoid false positives
+ * — two distinct players sharing identical score AND elapsed-ms is
+ * vanishingly unlikely at the resolutions this game uses.
  */
 export function derivePersonalBestSurface(
   board: readonly LeaderboardEntry[],
@@ -38,9 +45,7 @@ export function derivePersonalBestSurface(
 
   const matchIndex = board.findIndex(
     (entry) =>
-      entry.score === personalBest.score &&
-      entry.timeMs === personalBest.timeMs &&
-      entry.initials === lastInitials,
+      entry.score === personalBest.score && entry.timeMs === personalBest.timeMs,
   );
   if (matchIndex >= 0) {
     return { kind: 'highlighted', atIndex: matchIndex };

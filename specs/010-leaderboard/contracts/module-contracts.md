@@ -95,9 +95,9 @@ export function derivePersonalBestSurface(
 - `shouldUpdatePersonalBest`: returns `true` if `current === null` OR `runScore > current.score`. (Ties don't update.)
 - `derivePersonalBestSurface`:
   - `personalBest === null` → `{ kind: 'absent' }`.
-  - else look for an entry in `board` where `entry.score === personalBest.score && entry.timeMs === personalBest.timeMs && entry.initials === lastInitials`. If found at index `i`, return `{ kind: 'highlighted', atIndex: i }`. Otherwise return `{ kind: 'pinned', entry: { initials: lastInitials, score, timeMs, submittedAt: personalBest.achievedAt } }`.
+  - else look for an entry in `board` where `entry.score === personalBest.score && entry.timeMs === personalBest.timeMs`. If found at index `i`, return `{ kind: 'highlighted', atIndex: i }`. Otherwise return `{ kind: 'pinned', entry: { initials: lastInitials, score, timeMs, submittedAt: personalBest.achievedAt } }`.
 
-The match criteria deliberately use `lastInitials` as part of the highlight key — if the player has been resetting initials, only the most recent submission's initials count as "yours" for highlight purposes. This is intentional: the personal-best surface is *device-local* and *player-claimed*.
+The match key is `(score, timeMs)` only — NOT initials. An earlier iteration required all three to match, but that produced a confusing duplicate-looking row whenever the player switched initials between submitting the PB run and viewing the leaderboard later (the pinned "Your best" row showed the new initials with the PB's numbers, sitting directly above the actual same-numbers entry under the old initials). Highlighting by (score, timeMs) collapses to the existing row when the run is represented on the board, regardless of which initials it was submitted under. False positives (two players on the same device coincidentally sharing identical score AND timeMs) are vanishingly unlikely at the resolutions this game uses.
 
 ---
 
