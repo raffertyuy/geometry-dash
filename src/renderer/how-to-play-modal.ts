@@ -146,7 +146,7 @@ export function createHowToPlayModal(
     const bullets = [
       'Endless 3-lane runner — your job is to dodge the obstacle blocks and answer the glowing question cubes.',
       'Switch lanes with Arrow keys, WASD, or a touch swipe (left / right).',
-      'You start with 3 lives. Hitting an obstacle costs a life and gives you a 3-second blinking invincibility window when you respawn.',
+      'You start with 3 lives. Hitting an obstacle costs a life and gives you a 1.5-second blinking invincibility window when you respawn.',
       'The run ends when you drop to zero lives. Your score floors at zero — wrong answers still cost their points, but they can never push your displayed score below zero.',
     ];
     for (const text of bullets) {

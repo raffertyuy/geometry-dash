@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-J5DKFXK0RW"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-J5DKFXK0RW');
+    </script>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -69,28 +77,8 @@
         line-height: 1.5;
       }
 
-      /* Two-step start-screen entry: first tap primes audio and updates
-         the prompt text via CSS; second tap begins the run. The text swap
-         is driven by replacing the prompt's ::before pseudo-content; the
-         underlying <p> text is hidden when the class is active to avoid
-         the original "Press any key or tap to start" remaining visible. */
       #start-screen .start-prompt {
         font-size: clamp(1.0rem, 2.4vw, 1.2rem);
-      }
-
-      #start-screen.is-audio-primed .start-prompt {
-        visibility: hidden;
-        position: relative;
-      }
-
-      #start-screen.is-audio-primed .start-prompt::before {
-        content: '🎵 Press again to begin';
-        visibility: visible;
-        position: absolute;
-        left: 0;
-        right: 0;
-        text-align: center;
-        animation: start-prompt-pulse 1.4s ease-in-out infinite;
       }
 
       @keyframes start-prompt-pulse {
@@ -440,7 +428,9 @@
       #floating-scores {
         position: fixed;
         top: clamp(48px, 6vh, 64px);
-        right: 20px;
+        /* Aligned with the HUD's right padding so badges drift up beneath
+           the score readout. */
+        right: clamp(16px, 4vw, 24px);
         z-index: 6;
         pointer-events: none;
         display: flex;
@@ -691,46 +681,66 @@
       }
 
       #how-to-play-overlay .close-button {
+        align-items: center;
         appearance: none;
         background: transparent;
-        border: none;
+        border: 1px solid transparent;
+        border-radius: 10px;
         color: #9090a0;
         cursor: pointer;
-        font-size: 1.4rem;
+        display: inline-flex;
+        font-size: clamp(1.8rem, 5.5vw, 2.2rem);
+        height: clamp(44px, 11vw, 56px);
+        justify-content: center;
         line-height: 1;
-        padding: 0.2em 0.5em;
+        padding: 0;
         position: absolute;
-        right: 0.5em;
-        top: 0.4em;
-        transition: color 120ms ease-out;
+        right: 0.4em;
+        top: 0.3em;
+        transition: color 120ms ease-out, background 120ms ease-out, border-color 120ms ease-out;
+        width: clamp(44px, 11vw, 56px);
       }
 
       #how-to-play-overlay .close-button:hover,
       #how-to-play-overlay .close-button:focus-visible {
+        background: rgba(24, 200, 255, 0.12);
+        border-color: rgba(24, 200, 255, 0.45);
         color: #18c8ff;
         outline: none;
       }
 
-      /* Pause button — top-centre HUD affordance shown only during an
-         active run. Disabled state applies during gate modals + respawn
-         invincibility, conveyed visually by reduced opacity + no-cursor. */
+      /* Pause button — bottom-right FAB sized for a right-handed thumb on
+         mobile (≥56px touch target, rounded-square, semi-transparent so the
+         lane underneath stays readable). Disabled state applies during gate
+         modals + respawn invincibility, conveyed visually by reduced opacity
+         + no-cursor. Respects iOS safe-area insets so it never sits under
+         the home-indicator gesture strip. */
       .pause-button {
         appearance: none;
-        background: rgba(8, 12, 24, 0.7);
-        border: 1px solid rgba(24, 200, 255, 0.45);
-        border-radius: 6px;
+        align-items: center;
+        background: rgba(8, 12, 24, 0.72);
+        border: 2px solid rgba(24, 200, 255, 0.55);
+        border-radius: 18px;
+        bottom: max(clamp(20px, 5vh, 36px), env(safe-area-inset-bottom));
+        box-shadow: 0 0 14px rgba(24, 200, 255, 0.32), inset 0 0 6px rgba(24, 200, 255, 0.12);
         color: #18c8ff;
         cursor: pointer;
-        font-size: clamp(1rem, 2.4vw, 1.25rem);
-        left: 50%;
+        display: inline-flex;
+        font-size: clamp(1.6rem, 5.5vw, 2.1rem);
+        height: clamp(56px, 14vw, 72px);
+        justify-content: center;
         line-height: 1;
-        padding: 0.3em 0.7em;
+        padding: 0;
         pointer-events: auto;
         position: fixed;
-        top: clamp(8px, 1.5vh, 16px);
-        transform: translateX(-50%);
-        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
+        right: max(clamp(16px, 4vw, 24px), env(safe-area-inset-right));
+        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out, transform 80ms ease-out;
+        width: clamp(56px, 14vw, 72px);
         z-index: 5;
+      }
+
+      .pause-button:active:not([disabled]):not(.is-disabled) {
+        transform: scale(0.94);
       }
 
       .pause-button:hover,
@@ -746,24 +756,36 @@
         opacity: 0.35;
       }
 
-      /* Mute button — always visible, always reachable. Positioned at the
-         top-right of the playfield, balancing the centred Pause button. */
+      /* Mute button — bottom-left FAB mirroring the Pause button so a
+         left-hand thumb can reach it just as easily as the right-hand
+         Pause. Same size, border-radius, and border treatment for a
+         consistent on-screen pair. Respects iOS safe-area insets. */
       .mute-button {
         appearance: none;
-        background: rgba(8, 12, 24, 0.7);
-        border: 1px solid rgba(24, 200, 255, 0.45);
-        border-radius: 6px;
+        align-items: center;
+        background: rgba(8, 12, 24, 0.72);
+        border: 2px solid rgba(24, 200, 255, 0.55);
+        border-radius: 18px;
+        bottom: max(clamp(20px, 5vh, 36px), env(safe-area-inset-bottom));
+        box-shadow: 0 0 14px rgba(24, 200, 255, 0.32), inset 0 0 6px rgba(24, 200, 255, 0.12);
         color: #18c8ff;
         cursor: pointer;
-        font-size: clamp(1rem, 2.4vw, 1.25rem);
+        display: inline-flex;
+        font-size: clamp(1.6rem, 5.5vw, 2.1rem);
+        height: clamp(56px, 14vw, 72px);
+        justify-content: center;
+        left: max(clamp(16px, 4vw, 24px), env(safe-area-inset-left));
         line-height: 1;
-        padding: 0.3em 0.55em;
+        padding: 0;
         pointer-events: auto;
         position: fixed;
-        right: clamp(8px, 1.5vw, 16px);
-        top: clamp(8px, 1.5vh, 16px);
-        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out;
+        transition: background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out, transform 80ms ease-out;
+        width: clamp(56px, 14vw, 72px);
         z-index: 5;
+      }
+
+      .mute-button:active:not([disabled]):not(.is-disabled) {
+        transform: scale(0.94);
       }
 
       .mute-button:hover,
@@ -776,7 +798,52 @@
       .mute-button.is-muted {
         color: #9090a0;
         border-color: rgba(144, 144, 160, 0.45);
-        opacity: 0.7;
+        box-shadow: 0 0 12px rgba(144, 144, 160, 0.25), inset 0 0 6px rgba(144, 144, 160, 0.1);
+        opacity: 0.78;
+      }
+
+      /* Big "ready-up" countdown shown after a problem-gate answer commits
+         and the modal closes — gives the player a beat to re-grip before
+         the world starts moving again. The overlay swallows no input; it's
+         purely visual. Each digit re-triggers the pulse animation by
+         toggling .is-pulsing (a JS-side reflow restart). */
+      #resume-countdown {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 6;
+      }
+
+      #resume-countdown.hidden {
+        display: none;
+      }
+
+      .resume-countdown-digit {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: clamp(7rem, 32vw, 16rem);
+        font-weight: 900;
+        color: #18c8ff;
+        text-shadow:
+          0 0 24px rgba(24, 200, 255, 0.85),
+          0 0 56px rgba(24, 200, 255, 0.55);
+        letter-spacing: 0.05em;
+        line-height: 1;
+        opacity: 0;
+        transform: scale(0.55);
+      }
+
+      .resume-countdown-digit.is-pulsing {
+        animation: resume-countdown-pulse 1s ease-out forwards;
+      }
+
+      @keyframes resume-countdown-pulse {
+        0%   { transform: scale(0.55); opacity: 0; }
+        20%  { transform: scale(1.15); opacity: 1; }
+        80%  { transform: scale(1);    opacity: 1; }
+        100% { transform: scale(0.9);  opacity: 0.6; }
       }
 
       /* Leaderboard panel — rendered on start screen + game-over screen.
@@ -1103,6 +1170,8 @@ Swipe left or right on mobile</p>
     <section id="submission-form" class="hidden" data-no-game-start="true" aria-label="Submit your score"></section>
 
     <div id="floating-scores" aria-hidden="true"></div>
+
+    <div id="resume-countdown" class="hidden" aria-live="polite" aria-hidden="true"></div>
 
     <div id="debug-overlay" class="hidden"></div>
 

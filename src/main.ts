@@ -18,6 +18,7 @@ function bootstrap(): void {
   const howToPlayLinkGameOver = document.querySelector<HTMLElement>('#how-to-play-link-game-over');
   const pauseButton = document.querySelector<HTMLButtonElement>('#pause-button');
   const muteButton = document.querySelector<HTMLButtonElement>('#mute-button');
+  const resumeCountdown = document.querySelector<HTMLElement>('#resume-countdown');
   const leaderboardPanel = document.querySelector<HTMLElement>('#leaderboard-panel');
   const submissionForm = document.querySelector<HTMLElement>('#submission-form');
 
@@ -39,6 +40,7 @@ function bootstrap(): void {
     !howToPlayLinkGameOver ||
     !pauseButton ||
     !muteButton ||
+    !resumeCountdown ||
     !leaderboardPanel ||
     !submissionForm
   ) {
@@ -60,6 +62,7 @@ function bootstrap(): void {
       howToPlayLinkGameOver,
       pauseButton,
       muteButton,
+      resumeCountdown,
       leaderboardPanel,
       submissionForm,
     });
@@ -84,6 +87,7 @@ function bootstrap(): void {
     howToPlayLinkGameOver,
     pauseButton,
     muteButton,
+    resumeCountdown,
     leaderboardPanel,
     submissionForm,
   });

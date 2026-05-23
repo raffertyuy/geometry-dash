@@ -29,10 +29,11 @@ export const INPUT_COALESCE_WINDOW_MS = 50;
 // places the first obstacle ~1.4 s of running ahead of the player at the
 // current RUN_SPEED_UNITS_PER_SEC. MIN_GAP is the smallest acceptable gap
 // between successive groups; at the current run speed (24 u/s) and 200 ms
-// lane-switch duration, 14 world units is ~583 ms of running time, which
-// covers a full two-lane dodge (400 ms) plus ~183 ms of reaction time.
-export const OBSTACLES_MIN_GAP = 14;
-export const OBSTACLES_MAX_GAP = 28;
+// lane-switch duration, 24 world units is ~1.0 s of running time — a hair
+// over the two-lane dodge (400 ms) plus ~600 ms of reaction/recovery so
+// the obstacle field feels paced without long empty stretches.
+export const OBSTACLES_MIN_GAP = 24;
+export const OBSTACLES_MAX_GAP = 40;
 export const OBSTACLES_INITIAL_SPAWN_Z = -34;
 export const OBSTACLES_SINGLE_LANE_PROBABILITY = 0.8;
 
@@ -55,7 +56,7 @@ export const ESCALATION_SPEED_MULTIPLIER_PER_TIER = 1.10;
 // Only obstacle collisions grant the post-respawn invincibility window
 // (per spec FR-010/FR-011). Wrong-answer life loss is instantaneous.
 export const MAX_LIVES = 3;
-export const INVINCIBILITY_DURATION_MS = 3_000;
+export const INVINCIBILITY_DURATION_MS = 1_500;
 
 // Problem-gate scoring. Each gate's reward magnitude doubles as its penalty
 // magnitude: correct answer = +N points; wrong answer = -N points AND -1 life.
