@@ -125,6 +125,38 @@ if (
   );
 }
 
+// Leaderboard (slice 010). One JSON blob in Cloudflare KV (binding LEADERBOARD,
+// namespace geometry-dash-leaderboard). Submission writes only when a run
+// would crack the top N. Anti-abuse is intentionally light for v1: server-side
+// payload validation + a fixed-window per-IP rate limit + a small embedded
+// profanity wordlist + a time-derived score plausibility bound. See
+// specs/010-leaderboard/research.md for the full rationale.
+export const LEADERBOARD_MAX_ENTRIES = 20;
+
+/** Plausible upper bound on legitimate scoring per second (R5). */
+export const LEADERBOARD_PLAUSIBLE_MAX_PER_SECOND = 50_000;
+
+/** Floor on the plausibility bound — absorbs early-game flukes. */
+export const LEADERBOARD_PLAUSIBLE_MIN_FLOOR = 100_000;
+
+/** Max submissions per IP per fixed hour bucket. */
+export const LEADERBOARD_RATE_LIMIT_PER_HOUR = 10;
+
+/** TTL on rate-limit bucket keys (= 2 x window length). */
+export const LEADERBOARD_RATE_LIMIT_BUCKET_TTL_SECONDS = 7200;
+
+/** Fetch / submit timeout on the client. */
+export const LEADERBOARD_FETCH_TIMEOUT_MS = 5_000;
+
+/** localStorage key for the last-used initials. */
+export const LEADERBOARD_STORAGE_KEY_LAST_INITIALS = 'gd:leaderboard:lastInitials';
+
+/** localStorage key for the per-device personal best record. */
+export const LEADERBOARD_STORAGE_KEY_PERSONAL_BEST = 'gd:leaderboard:personalBest';
+
+/** Default initials shown in the submission form when no prior submission exists. */
+export const LEADERBOARD_DEFAULT_INITIALS = 'AAA';
+
 function readDebugFlag(): boolean {
   if (typeof window === 'undefined') return false;
   try {
