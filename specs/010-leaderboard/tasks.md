@@ -66,7 +66,7 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
 
 ### Tests for US1
 
-- [ ] T013 [P] [US1] Create `src/leaderboard/client.test.ts` per [contracts/module-contracts.md §2](./contracts/module-contracts.md). Inject a mock `fetch`. Cover:
+- [X] T013 [P] [US1] Create `src/leaderboard/client.test.ts` per [contracts/module-contracts.md §2](./contracts/module-contracts.md). Inject a mock `fetch`. Cover:
   - `fetchLeaderboard` success → `{ kind: 'success', entries }`.
   - Network error → `{ kind: 'offline', reason: 'network' }`.
   - `AbortController` timeout → `{ kind: 'offline', reason: 'timeout' }`.
@@ -77,7 +77,7 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
   - `submitScore` 429 → `{ accepted: false, error: 'rate_limited', retryAfterSeconds }`.
   - `submitScore` network error → `{ accepted: false, error: 'storage_unavailable' }`.
   - All cases emit the appropriate `console.debug` event (verify with a `vi.spyOn(console, 'debug')`).
-- [ ] T014 [P] [US1] Create `src/renderer/leaderboard-panel.test.ts` (jsdom). Cover:
+- [X] T014 [P] [US1] Create `src/renderer/leaderboard-panel.test.ts` (jsdom). Cover:
   - `success` with 0 entries → empty-state message rendered.
   - `success` with N entries → exactly N rows; each row exposes rank, initials, score, time, date.
   - `offline` → offline message; no table.
@@ -88,21 +88,21 @@ description: "Task list for feature 010 — Global Leaderboard (Cloudflare KV-ba
 
 ### Implementation for US1
 
-- [ ] T015 [P] [US1] Create `src/leaderboard/client.ts` per [contracts/module-contracts.md §2](./contracts/module-contracts.md). Use the native `fetch` and `AbortController`. Default `timeoutMs = LEADERBOARD_FETCH_TIMEOUT_MS`. All paths emit the required `console.debug` events.
-- [ ] T016 [P] [US1] Create `src/leaderboard/gate.ts` per [contracts/module-contracts.md §3](./contracts/module-contracts.md) — pure `shouldPromptForSubmission(board, runScore): boolean`. Include `src/leaderboard/gate.test.ts` with the truth table from the contract (empty board + score 0 → false; empty + score > 0 → true; full board + score > 20th → true; full + score ≤ 20th → false).
-- [ ] T017 [P] [US1] Create `src/leaderboard/types.ts` exporting `PersonalBest`, `FetchStatus`, `PersonalBestSurface` per [data-model.md §2](./data-model.md).
-- [ ] T018 [P] [US1] Create `src/leaderboard/index.ts` re-exporting the public surfaces per [contracts/module-contracts.md §6](./contracts/module-contracts.md).
-- [ ] T019 [US1] Create `src/renderer/leaderboard-panel.ts` per [contracts/module-contracts.md §14](./contracts/module-contracts.md). Renders semantic `<table>` for the data state; `<p>` for empty / offline. Pin-row above table when applicable. Sets `data-no-game-start="true"` on the host. Updates idempotent.
-- [ ] T020 [US1] Update `index.html`: add `<section id="leaderboard-panel" data-no-game-start="true" hidden></section>` adjacent to the existing overlays. Add inline CSS so the panel sits in a corner on desktop and full-width-but-bounded on ≤480px viewports, follows the existing pause-modal palette, and never sits OVER the "Tap to play" prompt. Add `<section id="submission-form" data-no-game-start="true" hidden></section>` too (used in US2; declaring the host here keeps `index.html` edits in one commit). Form-specific CSS is added later in T039.
-- [ ] T021 [US1] Update `src/main.ts`: query `#leaderboard-panel` and `#submission-form` (HTMLElement), pass through to `createGameLoop` as new entries on `GameLoopHostElements`. Type-only addition for the form host — US2 wires the actual form factory.
-- [ ] T022 [US1] Update `src/game/game-loop.ts`:
+- [X] T015 [P] [US1] Create `src/leaderboard/client.ts` per [contracts/module-contracts.md §2](./contracts/module-contracts.md). Use the native `fetch` and `AbortController`. Default `timeoutMs = LEADERBOARD_FETCH_TIMEOUT_MS`. All paths emit the required `console.debug` events.
+- [X] T016 [P] [US1] Create `src/leaderboard/gate.ts` per [contracts/module-contracts.md §3](./contracts/module-contracts.md) — pure `shouldPromptForSubmission(board, runScore): boolean`. Include `src/leaderboard/gate.test.ts` with the truth table from the contract (empty board + score 0 → false; empty + score > 0 → true; full board + score > 20th → true; full + score ≤ 20th → false).
+- [X] T017 [P] [US1] Create `src/leaderboard/types.ts` exporting `PersonalBest`, `FetchStatus`, `PersonalBestSurface` per [data-model.md §2](./data-model.md).
+- [X] T018 [P] [US1] Create `src/leaderboard/index.ts` re-exporting the public surfaces per [contracts/module-contracts.md §6](./contracts/module-contracts.md).
+- [X] T019 [US1] Create `src/renderer/leaderboard-panel.ts` per [contracts/module-contracts.md §14](./contracts/module-contracts.md). Renders semantic `<table>` for the data state; `<p>` for empty / offline. Pin-row above table when applicable. Sets `data-no-game-start="true"` on the host. Updates idempotent.
+- [X] T020 [US1] Update `index.html`: add `<section id="leaderboard-panel" data-no-game-start="true" hidden></section>` adjacent to the existing overlays. Add inline CSS so the panel sits in a corner on desktop and full-width-but-bounded on ≤480px viewports, follows the existing pause-modal palette, and never sits OVER the "Tap to play" prompt. Add `<section id="submission-form" data-no-game-start="true" hidden></section>` too (used in US2; declaring the host here keeps `index.html` edits in one commit). Form-specific CSS is added later in T039.
+- [X] T021 [US1] Update `src/main.ts`: query `#leaderboard-panel` and `#submission-form` (HTMLElement), pass through to `createGameLoop` as new entries on `GameLoopHostElements`. Type-only addition for the form host — US2 wires the actual form factory.
+- [X] T022 [US1] Update `src/game/game-loop.ts`:
   - Extend `GameLoopHostElements` with `leaderboardPanel: HTMLElement` and `submissionForm: HTMLElement` (form host stays unused this phase).
   - On construction: build `leaderboardClient = createLeaderboardClient()`, `leaderboardPanel = createLeaderboardPanel(host.leaderboardPanel)`, `leaderboardStorage = createLeaderboardStorage()`, `currentBoard: readonly LeaderboardEntry[] = []`, `fetchStatus: FetchStatus = { kind: 'idle' }`.
   - Add a private `refreshLeaderboard()` that sets `fetchStatus = { kind: 'loading' }`, renders the panel, then calls `client.fetchLeaderboard()`, then updates `currentBoard + fetchStatus` accordingly and re-renders the panel.
   - Trigger `refreshLeaderboard()` once at construction time (so the start screen has data) and once after a game-over transition.
   - Show the leaderboard panel during the start-screen and game-over states; hide it during active runs (set `hidden` attribute on the host).
   - Add a click-target guard: when handling the "tap to start" event, skip starting if `event.target` is inside an element with `data-no-game-start="true"`.
-- [ ] T023 [US1] Update `src/renderer/index.ts` to export `createLeaderboardPanel` + type `LeaderboardPanel`. **Note**: T038 (US2) also edits this file to append `createSubmissionForm` exports. If US1 and US2 are implemented in parallel by two developers, serialise the `src/renderer/index.ts` edits (do T023 first, then T038) to avoid a merge conflict.
+- [X] T023 [US1] Update `src/renderer/index.ts` to export `createLeaderboardPanel` + type `LeaderboardPanel`. **Note**: T038 (US2) also edits this file to append `createSubmissionForm` exports. If US1 and US2 are implemented in parallel by two developers, serialise the `src/renderer/index.ts` edits (do T023 first, then T038) to avoid a merge conflict.
 
 **Checkpoint**: US1 is independently testable. With a manually-seeded KV, the start screen + game-over screen show the board; "Tap to play" still works. Offline state appears when the Worker is stopped. The pinned / highlighted PB row never appears (PB derivation isn't wired until US3).
 

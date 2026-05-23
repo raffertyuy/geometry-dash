@@ -6,4 +6,9 @@ export { createFloatingScore, type FloatingScore } from './floating-score';
 export { createHowToPlayModal, type HowToPlayModal } from './how-to-play-modal';
 export { createPauseButton, type PauseButton } from './pause-button';
 export { createMuteButton, type MuteButton } from './mute-button';
+export {
+  createLeaderboardPanel,
+  type LeaderboardPanel,
+  type LeaderboardPanelSnapshot,
+} from './leaderboard-panel';
 export { mathText } from './math-text';

@@ -778,6 +778,142 @@
         border-color: rgba(144, 144, 160, 0.45);
         opacity: 0.7;
       }
+
+      /* Leaderboard panel — rendered on start screen + game-over screen.
+         Sits to the side of the central overlay text on desktop; collapses
+         to a stacked block below the "Tap to play" prompt on narrow screens.
+         pointer-events:auto so taps inside the panel don't bubble to the
+         window-level "tap to start" handler (also guarded by the
+         data-no-game-start attribute the panel sets on itself). */
+      .leaderboard-panel {
+        background: rgba(8, 12, 24, 0.7);
+        border: 1px solid rgba(24, 200, 255, 0.45);
+        border-radius: 8px;
+        color: #e8e8ef;
+        padding: clamp(10px, 1.5vw, 14px) clamp(12px, 1.8vw, 18px);
+        pointer-events: auto;
+        position: fixed;
+        right: clamp(10px, 2vw, 24px);
+        bottom: clamp(10px, 2vh, 24px);
+        max-width: min(420px, 92vw);
+        max-height: min(60vh, 480px);
+        overflow-y: auto;
+        z-index: 11;
+        font-size: clamp(0.8rem, 1.5vw, 0.95rem);
+      }
+
+      .leaderboard-panel.hidden {
+        display: none;
+      }
+
+      .leaderboard-panel__heading {
+        color: #18c8ff;
+        font-size: clamp(1rem, 2vw, 1.2rem);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        margin: 0 0 0.6em 0;
+        text-align: center;
+      }
+
+      .leaderboard-panel__message {
+        color: #9090a0;
+        margin: 0.4em 0;
+        text-align: center;
+        font-style: italic;
+      }
+
+      .leaderboard-panel__message--offline {
+        color: #d97a7a;
+      }
+
+      .leaderboard-panel__table {
+        border-collapse: collapse;
+        width: 100%;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .leaderboard-panel__head {
+        color: #18c8ff;
+        font-size: 0.78em;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        padding: 0.2em 0.45em;
+        text-align: left;
+        text-transform: uppercase;
+        border-bottom: 1px solid rgba(24, 200, 255, 0.25);
+      }
+
+      .leaderboard-panel__head--rank,
+      .leaderboard-panel__head--score,
+      .leaderboard-panel__head--time {
+        text-align: right;
+      }
+
+      .leaderboard-panel__row {
+        transition: background 120ms ease-out;
+      }
+
+      .leaderboard-panel__row[data-highlighted='true'] {
+        background: rgba(255, 198, 50, 0.18);
+        outline: 1px solid rgba(255, 198, 50, 0.55);
+      }
+
+      .leaderboard-panel__row[data-pinned='true'] {
+        background: rgba(255, 198, 50, 0.12);
+        outline: 1px solid rgba(255, 198, 50, 0.4);
+        font-style: italic;
+      }
+
+      .leaderboard-panel__cell {
+        padding: 0.22em 0.45em;
+        white-space: nowrap;
+      }
+
+      .leaderboard-panel__cell--rank,
+      .leaderboard-panel__cell--score,
+      .leaderboard-panel__cell--time {
+        text-align: right;
+      }
+
+      .leaderboard-panel__cell--initials {
+        font-weight: 700;
+        color: #ffe18a;
+      }
+
+      .leaderboard-panel__cell--date {
+        color: #9090a0;
+        font-size: 0.85em;
+      }
+
+      @media (max-width: 600px) {
+        .leaderboard-panel {
+          /* On narrow viewports, stretch full-width at the bottom so it
+             doesn't fight with the centred Tap-to-play prompt. */
+          right: clamp(8px, 2vw, 16px);
+          left: clamp(8px, 2vw, 16px);
+          bottom: clamp(8px, 1.5vh, 14px);
+          max-height: 38vh;
+        }
+        .leaderboard-panel__cell--date {
+          display: none;
+        }
+        .leaderboard-panel__head--date {
+          display: none;
+        }
+      }
+
+      /* Submission form — opens conditionally on game-over when the run
+         would crack the top 20. Hidden by default. Form-specific CSS lands
+         in slice 010 task T039 (Phase 4 / US2). */
+      #submission-form {
+        position: fixed;
+        inset: 0;
+        display: none;
+      }
+
+      #submission-form:not(.hidden) {
+        display: flex;
+      }
     </style>
   </head>
   <body>
@@ -819,6 +955,10 @@ Swipe left or right on mobile</p>
     <button id="pause-button" class="pause-button hidden" type="button" aria-label="Pause" disabled>⏸</button>
 
     <button id="mute-button" class="mute-button" type="button" aria-label="Mute audio" aria-pressed="false">🔊</button>
+
+    <section id="leaderboard-panel" class="hidden" data-no-game-start="true" aria-label="Leaderboard"></section>
+
+    <section id="submission-form" class="hidden" data-no-game-start="true" aria-label="Submit your score"></section>
 
     <div id="floating-scores" aria-hidden="true"></div>
 

@@ -32,6 +32,7 @@ import {
   createDebugOverlay,
   createFloatingScore,
   createHowToPlayModal,
+  createLeaderboardPanel,
   createLivesHud,
   createMuteButton,
   createPauseButton,
@@ -40,6 +41,8 @@ import {
   type DebugOverlay,
   type FloatingScore,
   type HowToPlayModal,
+  type LeaderboardPanel,
+  type LeaderboardPanelSnapshot,
   type LivesHud,
   type MuteButton,
   type PauseButton,
@@ -47,6 +50,14 @@ import {
   type ThreeRenderer,
 } from '../renderer';
 import { createAudioEngine, type AudioEngine } from '../audio';
+import {
+  createLeaderboardClient,
+  createLeaderboardStorage,
+  type FetchStatus,
+  type LeaderboardClient,
+  type LeaderboardStorage,
+} from '../leaderboard';
+import type { LeaderboardEntry } from '../shared/leaderboard-types';
 import { computeScore, formatScore, formatTimer } from '../score';
 import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type {
@@ -78,6 +89,8 @@ export interface GameLoopHostElements {
   readonly howToPlayLinkGameOver: HTMLElement;
   readonly pauseButton: HTMLButtonElement;
   readonly muteButton: HTMLButtonElement;
+  readonly leaderboardPanel: HTMLElement;
+  readonly submissionForm: HTMLElement;
 }
 
 /**
@@ -224,6 +237,59 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     muteButton.setMuted(audioEngine.isMuted());
   });
   muteButton.setMuted(audioEngine.isMuted());
+
+  // Leaderboard (slice 010). The panel renders on start-screen and
+  // game-over; it's hidden during active runs. We fetch once at
+  // construction time and once after each game-over, then again after an
+  // accepted submission. No per-frame fetch.
+  //
+  // `leaderboardStorage` and `currentBoard` are wired here but unused
+  // in this phase; slice-010 US2 (submission flow) reads from both. They
+  // live at construction scope rather than being lazy-built later so the
+  // shape of the leaderboard state stays in one place.
+  const leaderboardClient: LeaderboardClient = createLeaderboardClient();
+  const leaderboardStorage: LeaderboardStorage = createLeaderboardStorage();
+  const leaderboardPanel: LeaderboardPanel = createLeaderboardPanel(host.leaderboardPanel);
+  let currentBoard: readonly LeaderboardEntry[] = [];
+  let fetchStatus: FetchStatus = { kind: 'idle' };
+
+  function panelSnapshot(): LeaderboardPanelSnapshot {
+    // PB surface lands in slice 010 phase 5 (US3). For now always absent.
+    return { fetch: fetchStatus, personalBestSurface: { kind: 'absent' } };
+  }
+  function renderLeaderboardPanel(): void {
+    leaderboardPanel.render(panelSnapshot());
+  }
+  async function refreshLeaderboard(): Promise<void> {
+    fetchStatus = { kind: 'loading' };
+    renderLeaderboardPanel();
+    const outcome = await leaderboardClient.fetchLeaderboard();
+    if (outcome.kind === 'success') {
+      currentBoard = outcome.entries;
+      fetchStatus = { kind: 'success', entries: outcome.entries };
+    } else {
+      // Keep last-known board cached in memory so the submission gate still
+      // has reasonable input if the next game-over happens during an offline
+      // blip.
+      fetchStatus = { kind: 'offline', reason: outcome.reason };
+    }
+    renderLeaderboardPanel();
+  }
+
+  // Silence "declared but never used" until slice-010 phase 4 / 5 wire
+  // these in. Pure readbacks; no behavioural side-effects.
+  void leaderboardStorage;
+  void currentBoard;
+  function showLeaderboardPanel(visible: boolean): void {
+    leaderboardPanel.setHostVisibility(visible);
+  }
+  // Kick off the initial fetch alongside bootstrap — the panel will swap
+  // from loading -> success/offline asynchronously without blocking the
+  // start screen.
+  void refreshLeaderboard();
+  // Start-screen is the default loopState; show the panel right away.
+  showLeaderboardPanel(true);
+
   livesHud.set(MAX_LIVES);
 
   function showStartScreen(visible: boolean): void {
@@ -251,6 +317,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     world = startRun(world);
     host.startScreen.classList.remove('is-audio-primed');
     showStartScreen(false);
+    showLeaderboardPanel(false);
     if (!isStartScreenAudioPrimed) {
       // Defensive — if beginRun is invoked from a code path that bypassed
       // the two-step prime (e.g., future automation), start BGM now.
@@ -276,9 +343,14 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     );
     host.gameOverTimer.textContent = formatTimer(world.tickMs);
     showGameOverOverlay(true);
+    // Refresh the leaderboard so the game-over screen shows the live board.
+    // Submission-form opening lands in slice 010 phase 4 (US2).
+    showLeaderboardPanel(true);
+    void refreshLeaderboard();
   }
 
   function restartFromInput(): void {
+    showLeaderboardPanel(false);
     world = restartRun(world);
     player = createPlayerState();
     obstacles = [];
@@ -407,11 +479,23 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     adapter.handleKeyDown({ key: event.key, repeat: event.repeat });
   }
 
+  function pointerIsOnNoGameStartSurface(event: PointerEvent): boolean {
+    // Walk up from event.target looking for the data-no-game-start="true"
+    // marker. Slice 010 uses this on the leaderboard panel and the
+    // submission form so taps inside them never trigger a run start /
+    // restart. Closest is supported in every evergreen browser.
+    const target = event.target;
+    if (!(target instanceof Element)) return false;
+    return target.closest('[data-no-game-start="true"]') !== null;
+  }
+
   function onPointerDown(event: PointerEvent): void {
     // While the How-to-Play modal is up, taps either land inside its body
     // or hit the backdrop. The modal's own click handler closes on backdrop
     // hits; the game-loop should not also start or restart the run.
     if (howToPlayModal.isVisible()) return;
+    // Leaderboard panel and submission form are tap-absorbing islands.
+    if (pointerIsOnNoGameStartSurface(event)) return;
     if (loopState === 'start-screen') {
       if (!isStartScreenAudioPrimed) {
         primeStartScreenAudio();
@@ -438,6 +522,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   function onPointerUp(event: PointerEvent): void {
     if (isAwaitingResume || isAwaitingRestart || loopState !== 'running') return;
     if (world.runState === 'answering') return;
+    if (pointerIsOnNoGameStartSurface(event)) return;
     adapter.handlePointerUp(event.clientX, event.clientY);
   }
 
@@ -643,6 +728,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     howToPlayModal.destroy();
     pauseButton.destroy();
     muteButton.destroy();
+    leaderboardPanel.destroy();
     audioEngine.destroy();
     problemModal.destroy();
     floatingScore.destroy();
