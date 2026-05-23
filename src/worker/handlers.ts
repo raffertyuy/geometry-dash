@@ -61,14 +61,19 @@ export async function handlePost(
     return { accepted: false, error: 'profanity' };
   }
 
-  // 3. Rate limit.
-  const rateLimit = await checkAndIncrement(ctx.kv, ctx.clientIp, ctx.now());
-  if (rateLimit.kind === 'rejected') {
-    return {
-      accepted: false,
-      error: 'rate_limited',
-      retryAfterSeconds: rateLimit.retryAfterSeconds,
-    };
+  // 3. Rate limit. Skipped in local dev (no CF-Connecting-IP header) so
+  // a developer iterating against `wrangler dev` doesn't lock themselves
+  // out after 10 test submissions. Cloudflare's edge always sets the
+  // header for real traffic, so production rate-limiting is unaffected.
+  if (ctx.clientIp !== null) {
+    const rateLimit = await checkAndIncrement(ctx.kv, ctx.clientIp, ctx.now());
+    if (rateLimit.kind === 'rejected') {
+      return {
+        accepted: false,
+        error: 'rate_limited',
+        retryAfterSeconds: rateLimit.retryAfterSeconds,
+      };
+    }
   }
 
   // 4. Read current board; decide if write is needed.

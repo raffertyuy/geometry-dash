@@ -5,10 +5,14 @@ import { createInMemoryKVAdapter, type KVAdapter } from './kv-adapter';
 import type { LeaderboardEntry } from '../shared/leaderboard-types';
 
 function ctxFor(kv: KVAdapter, opts: Partial<HandlerContext> = {}): HandlerContext {
+  // Use the `in` check so `clientIp: null` (explicit) survives — `??`
+  // would coalesce null back to the default and silently mask the
+  // null-IP code path under test.
+  const clientIp = 'clientIp' in opts ? (opts.clientIp ?? null) : '1.1.1.1';
   return {
     kv,
     now: opts.now ?? (() => new Date('2026-05-23T14:00:00.000Z')),
-    clientIp: opts.clientIp ?? '1.1.1.1',
+    clientIp,
     ...(opts.signingKey !== undefined ? { signingKey: opts.signingKey } : {}),
   };
 }
@@ -74,6 +78,17 @@ describe('handlePost', () => {
     if (!r.accepted) {
       expect(r.error).toBe('rate_limited');
       expect(r.retryAfterSeconds).toBeGreaterThan(0);
+    }
+  });
+
+  it('SKIPS rate-limit when clientIp is null (local dev — no CF-Connecting-IP header)', async () => {
+    const kv = createInMemoryKVAdapter();
+    const at = new Date('2026-05-23T14:00:00.000Z');
+    const baseCtx = ctxFor(kv, { now: () => at, clientIp: null });
+    // 20 successive submissions, all accepted — no rate-limit applies.
+    for (let i = 0; i < 20; i += 1) {
+      const r = await handlePost(baseCtx, { initials: 'RAF', score: i + 1, timeMs: 1000 });
+      expect(r.accepted).toBe(true);
     }
   });
 
