@@ -28,6 +28,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Wrangler / Cloudflare Workers local state
+.wrangler/
+.dev.vars
+
 # Misc
 *.tmp
 *.swp

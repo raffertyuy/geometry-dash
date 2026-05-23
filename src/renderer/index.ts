@@ -7,4 +7,14 @@ export { createHowToPlayModal, type HowToPlayModal } from './how-to-play-modal';
 export { createPauseButton, type PauseButton } from './pause-button';
 export { createMuteButton, type MuteButton } from './mute-button';
 export { createResumeCountdown, type ResumeCountdown } from './resume-countdown';
+export {
+  createLeaderboardPanel,
+  type LeaderboardPanel,
+  type LeaderboardPanelSnapshot,
+} from './leaderboard-panel';
+export {
+  createSubmissionForm,
+  type SubmissionForm,
+  type SubmissionFormHandlers,
+} from './submission-form';
 export { mathText } from './math-text';

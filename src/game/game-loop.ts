@@ -32,23 +32,43 @@ import {
   createDebugOverlay,
   createFloatingScore,
   createHowToPlayModal,
+  createLeaderboardPanel,
   createLivesHud,
   createMuteButton,
   createPauseButton,
   createProblemModal,
   createResumeCountdown,
+  createSubmissionForm,
   createThreeRenderer,
   type DebugOverlay,
   type FloatingScore,
   type HowToPlayModal,
+  type LeaderboardPanel,
+  type LeaderboardPanelSnapshot,
   type LivesHud,
   type MuteButton,
   type PauseButton,
   type ProblemModal,
   type ResumeCountdown,
+  type SubmissionForm,
   type ThreeRenderer,
 } from '../renderer';
 import { createAudioEngine, type AudioEngine } from '../audio';
+import {
+  createLeaderboardClient,
+  createLeaderboardStorage,
+  derivePersonalBestSurface,
+  shouldPromptForSubmission,
+  shouldUpdatePersonalBest,
+  type FetchStatus,
+  type LeaderboardClient,
+  type LeaderboardStorage,
+  type PersonalBest,
+} from '../leaderboard';
+import type {
+  LeaderboardEntry,
+  SubmissionErrorCode,
+} from '../shared/leaderboard-types';
 import { computeScore, formatScore, formatTimer } from '../score';
 import { MAX_LIVES, RUN_SPEED_UNITS_PER_SEC } from '../shared/config';
 import type {
@@ -81,6 +101,8 @@ export interface GameLoopHostElements {
   readonly pauseButton: HTMLButtonElement;
   readonly muteButton: HTMLButtonElement;
   readonly resumeCountdown: HTMLElement;
+  readonly leaderboardPanel: HTMLElement;
+  readonly submissionForm: HTMLElement;
 }
 
 /**
@@ -231,6 +253,129 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     muteButton.setMuted(audioEngine.isMuted());
   });
   muteButton.setMuted(audioEngine.isMuted());
+
+  // Leaderboard (slice 010). The panel renders on start-screen and
+  // game-over; it's hidden during active runs. We fetch once at
+  // construction time and once after each game-over, then again after an
+  // accepted submission. No per-frame fetch.
+  //
+  // `leaderboardStorage` and `currentBoard` are wired here but unused
+  // in this phase; slice-010 US2 (submission flow) reads from both. They
+  // live at construction scope rather than being lazy-built later so the
+  // shape of the leaderboard state stays in one place.
+  const leaderboardClient: LeaderboardClient = createLeaderboardClient();
+  const leaderboardStorage: LeaderboardStorage = createLeaderboardStorage();
+  const leaderboardPanel: LeaderboardPanel = createLeaderboardPanel(host.leaderboardPanel);
+  let currentBoard: readonly LeaderboardEntry[] = [];
+  let fetchStatus: FetchStatus = { kind: 'idle' };
+  let lastSubmitOutcome: string | null = null;
+  let personalBest: PersonalBest | null = leaderboardStorage.getPersonalBest();
+
+  function panelSnapshot(): LeaderboardPanelSnapshot {
+    return {
+      fetch: fetchStatus,
+      personalBestSurface: derivePersonalBestSurface(
+        currentBoard,
+        personalBest,
+        leaderboardStorage.getLastInitials(),
+      ),
+    };
+  }
+  function renderLeaderboardPanel(): void {
+    leaderboardPanel.render(panelSnapshot());
+  }
+  async function refreshLeaderboard(): Promise<void> {
+    fetchStatus = { kind: 'loading' };
+    renderLeaderboardPanel();
+    const outcome = await leaderboardClient.fetchLeaderboard();
+    if (outcome.kind === 'success') {
+      currentBoard = outcome.entries;
+      fetchStatus = { kind: 'success', entries: outcome.entries };
+    } else {
+      // Keep last-known board cached in memory so the submission gate still
+      // has reasonable input if the next game-over happens during an offline
+      // blip.
+      fetchStatus = { kind: 'offline', reason: outcome.reason };
+    }
+    renderLeaderboardPanel();
+  }
+
+  // Submission form (US2). Opens on game-over when shouldPromptForSubmission
+  // returns true. onSubmit posts to the worker; onSkip closes silently.
+  function messageForCode(error: SubmissionErrorCode, retryAfterSeconds?: number): string {
+    switch (error) {
+      case 'invalid_payload':
+        return 'Submission could not be verified';
+      case 'implausible_score':
+        return 'Submission could not be verified';
+      case 'profanity':
+        return 'Try different initials';
+      case 'rate_limited': {
+        if (typeof retryAfterSeconds === 'number') {
+          if (retryAfterSeconds < 60) {
+            return `Sorry — wait ${Math.max(1, Math.ceil(retryAfterSeconds))} s to submit more high scores`;
+          }
+          const minutes = Math.ceil(retryAfterSeconds / 60);
+          return `Sorry — wait ${minutes} min to submit more high scores`;
+        }
+        return 'Sorry — try again later to submit more high scores';
+      }
+      case 'storage_unavailable':
+        return 'Submission failed. Try again later';
+      default:
+        return 'Submission failed';
+    }
+  }
+
+  async function onSubmissionFormSubmit(initials: string): Promise<void> {
+    console.debug({ event: 'leaderboard_submit_attempted', initials });
+    submissionForm.setSubmitting(true);
+    submissionForm.setError(null);
+    leaderboardStorage.setLastInitials(initials);
+    const runScore = computeScore(world.tickMs, world.scoreDelta);
+    const runTimeMs = Math.max(0, Math.floor(world.tickMs));
+    const response = await leaderboardClient.submitScore({
+      initials,
+      score: Math.max(0, Math.floor(runScore)),
+      timeMs: runTimeMs,
+    });
+    if (response.accepted) {
+      console.debug({ event: 'leaderboard_submit_accepted_by_game', count: response.entries.length });
+      currentBoard = response.entries;
+      fetchStatus = { kind: 'success', entries: response.entries };
+      lastSubmitOutcome = 'accepted';
+      renderLeaderboardPanel();
+      submissionForm.close();
+    } else {
+      console.debug({ event: 'leaderboard_submit_rejected_by_game', code: response.error });
+      lastSubmitOutcome = `rejected:${response.error}`;
+      submissionForm.setSubmitting(false);
+      submissionForm.setError(messageForCode(response.error, response.retryAfterSeconds));
+    }
+  }
+
+  function onSubmissionFormSkip(): void {
+    console.debug({ event: 'leaderboard_submit_skipped' });
+    lastSubmitOutcome = 'skipped';
+    submissionForm.close();
+  }
+
+  const submissionForm: SubmissionForm = createSubmissionForm(host.submissionForm, {
+    onSubmit: (initials) => {
+      void onSubmissionFormSubmit(initials);
+    },
+    onSkip: onSubmissionFormSkip,
+  });
+  function showLeaderboardPanel(visible: boolean): void {
+    leaderboardPanel.setHostVisibility(visible);
+  }
+  // Kick off the initial fetch alongside bootstrap — the panel will swap
+  // from loading -> success/offline asynchronously without blocking the
+  // start screen.
+  void refreshLeaderboard();
+  // Start-screen is the default loopState; show the panel right away.
+  showLeaderboardPanel(true);
+
   livesHud.set(MAX_LIVES);
 
   function showStartScreen(visible: boolean): void {
@@ -249,6 +394,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     loopState = 'running';
     world = startRun(world);
     showStartScreen(false);
+    showLeaderboardPanel(false);
     audioEngine.startBgm('default');
   }
 
@@ -270,9 +416,39 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     );
     host.gameOverTimer.textContent = formatTimer(world.tickMs);
     showGameOverOverlay(true);
+    // Refresh the leaderboard so the game-over screen shows the live board.
+    showLeaderboardPanel(true);
+    // Persist personal best BEFORE refreshing the panel so the derivation
+    // sees the up-to-date PB. The PB is per-device and updates on any new
+    // high regardless of whether the run cracked the global board.
+    const runScore = computeScore(world.tickMs, world.scoreDelta);
+    const runTimeMs = Math.max(0, Math.floor(world.tickMs));
+    const flooredRunScore = Math.max(0, Math.floor(runScore));
+    if (shouldUpdatePersonalBest(personalBest, flooredRunScore, runTimeMs)) {
+      personalBest = {
+        score: flooredRunScore,
+        timeMs: runTimeMs,
+        achievedAt: new Date().toISOString(),
+      };
+      leaderboardStorage.setPersonalBest(personalBest);
+      console.debug({
+        event: 'leaderboard_personal_best_updated',
+        score: personalBest.score,
+        timeMs: personalBest.timeMs,
+      });
+    }
+    void refreshLeaderboard();
+    // Open the submission form if the run cracked the cached top 20. The
+    // server will revalidate, so a stale board here is safe — at worst the
+    // submission is silently accepted without writing.
+    if (runScore > 0 && shouldPromptForSubmission(currentBoard, flooredRunScore)) {
+      submissionForm.open(leaderboardStorage.getLastInitials());
+    }
   }
 
   function restartFromInput(): void {
+    showLeaderboardPanel(false);
+    submissionForm.close();
     world = restartRun(world);
     player = createPlayerState();
     obstacles = [];
@@ -375,8 +551,14 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   // ---- DOM event bridging ----
 
   function onKeyDown(event: KeyboardEvent): void {
-    // Mute toggle is global — works in every loop state regardless of any
-    // modal being open.
+    // Submission form owns the keyboard completely while open — its own
+    // capture-phase listener handles Enter (submit) and Escape (skip);
+    // every OTHER keystroke must land in the initials <input> with no
+    // side effect on the game-loop (typing "M" must not toggle mute,
+    // typing any letter must not trigger restart, etc.).
+    if (submissionForm.isOpen()) return;
+    // Mute toggle is global outside the submission form — works in every
+    // other loop state regardless of any modal being open.
     if (event.key === 'm' || event.key === 'M') {
       audioEngine.setMuted(!audioEngine.isMuted());
       muteButton.setMuted(audioEngine.isMuted());
@@ -417,11 +599,23 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     adapter.handleKeyDown({ key: event.key, repeat: event.repeat });
   }
 
+  function pointerIsOnNoGameStartSurface(event: PointerEvent): boolean {
+    // Walk up from event.target looking for the data-no-game-start="true"
+    // marker. Slice 010 uses this on the leaderboard panel and the
+    // submission form so taps inside them never trigger a run start /
+    // restart. Closest is supported in every evergreen browser.
+    const target = event.target;
+    if (!(target instanceof Element)) return false;
+    return target.closest('[data-no-game-start="true"]') !== null;
+  }
+
   function onPointerDown(event: PointerEvent): void {
     // While the How-to-Play modal is up, taps either land inside its body
     // or hit the backdrop. The modal's own click handler closes on backdrop
     // hits; the game-loop should not also start or restart the run.
     if (howToPlayModal.isVisible()) return;
+    // Leaderboard panel and submission form are tap-absorbing islands.
+    if (pointerIsOnNoGameStartSurface(event)) return;
     if (loopState === 'start-screen') {
       beginRun();
       return;
@@ -445,6 +639,7 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
   function onPointerUp(event: PointerEvent): void {
     if (isAwaitingResume || isAwaitingRestart || loopState !== 'running') return;
     if (world.runState === 'answering') return;
+    if (pointerIsOnNoGameStartSurface(event)) return;
     adapter.handlePointerUp(event.clientX, event.clientY);
   }
 
@@ -642,7 +837,12 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     renderer.updateObstacles(obstacles);
     renderer.updateGates(gates, world.tickMs);
     renderer.draw(player, world);
-    debugOverlay.update(player, world, lastInput, problemModal.getDebugSnapshot());
+    debugOverlay.update(player, world, lastInput, problemModal.getDebugSnapshot(), {
+      fetch: fetchStatus.kind,
+      entries: fetchStatus.kind === 'success' ? fetchStatus.entries.length : 0,
+      personalBest: leaderboardStorage.getPersonalBest()?.score ?? null,
+      lastSubmit: lastSubmitOutcome,
+    });
     livesHud.set(world.lives);
     const pbState = derivePauseButtonState(loopState, world, howToPlayModal.isVisible());
     pauseButton.setVisible(pbState.visible);
@@ -675,6 +875,8 @@ export function createGameLoop(host: GameLoopHostElements): GameLoopHandles {
     howToPlayModal.destroy();
     pauseButton.destroy();
     muteButton.destroy();
+    leaderboardPanel.destroy();
+    submissionForm.destroy();
     audioEngine.destroy();
     problemModal.destroy();
     resumeCountdown.destroy();

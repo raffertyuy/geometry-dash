@@ -38,6 +38,24 @@ You have standing permission to evolve the dev environment when it helps the wor
 
 Still narrate what you're changing and why, and roll changes back if they don't earn their keep.
 
+## Public repo / secrets policy
+
+This codebase is published to a **public GitHub repo** (`raffertyuy/geometry-dash`). Everything checked in is world-readable. Before committing, audit for accidental secrets.
+
+**Safe to commit** (per Cloudflare's own published examples — these are identifiers, not credentials):
+
+- Cloudflare KV namespace IDs, D1 database IDs, R2 bucket names, Queue names.
+- Worker name, binding names, route patterns, custom domain (`trgd.raztype.com`).
+- Cloudflare account ID — technically non-sensitive but keep it OUT of the repo as a defence-in-depth measure; let `wrangler` pick it up from the local session or CI env.
+
+**Never commit — must live in Cloudflare Worker secrets or GitHub Actions secrets**:
+
+- Cloudflare API tokens (`CLOUDFLARE_API_TOKEN`) → GitHub repo settings → Secrets and variables → Actions, for any CI-driven `wrangler deploy`.
+- HMAC / JWT signing keys, OAuth client secrets, third-party API keys, DB passwords, encryption keys → `wrangler secret put NAME` (or dashboard → Worker → Settings → Variables → Encrypt) so they're available as `env.NAME` at runtime but never in source.
+- Anything in a `.env*` file that isn't `.env.example`. The repo's `.gitignore` should ignore real `.env*`; only `.env.example` (with dummy values) is committable.
+
+**When introducing a new feature that needs a secret**: surface it in the slice's `spec.md` / `plan.md`, list the required secret names + where they live (Worker secret vs. GitHub Actions secret), and document the bootstrap step in `quickstart.md` so a fresh contributor can run the project. Never paste real values into Spec Kit artifacts — even committed plans go public.
+
 ## Project rules
 
 The project **constitution** lives at `.specify/memory/constitution.md` and is binding. Summary of v1.0.0:
@@ -61,16 +79,17 @@ Constraints to keep in mind:
 - `README.md` - the human-facing introduction to the project for junior developers. **Keep this in sync** when shipping new features: each completed slice should update the "What's in it (so far)" section with a one-line summary of the new capability. The README also flags that the project is 100% vibe-coded with the Spec Kit, so the section list itself is part of the story.
 
 <!-- SPECKIT START -->
-**Active feature**: `009-audio` — Add a Web Audio engine with two looping BGM tracks (a calm tron-ambient default during running and a tense math-contest "battle of the brains" theme while a problem-gate modal is open — hard-cut swap, not a pause), procedural SFX (one OscillatorNode + GainNode envelope per event, zero asset bytes) for lane change / obstacle hit / problem-cube hit / correct answer / life lost / countdown tick / game over, a HUD mute button (also triggered by the `M` keyboard shortcut) implemented as a master-gain switch so un-muting never requires a fresh user gesture, and mobile-autoplay compliance via a gesture-latch that defers AudioContext creation until the first user input.
+**Active feature**: `010-leaderboard` — Add a global top-20 leaderboard backed by a single Cloudflare Worker handler that reads / writes one JSON blob in a Cloudflare KV namespace (`geometry-dash-leaderboard`, binding `LEADERBOARD`). The client gains a new `src/leaderboard/` pure-logic module (fetch, submission gating, personal-best derivation, localStorage adapter), a DOM panel on the start + game-over screens, and a 3-letter-initials submission form that opens only when a run cracks the top 20. Anti-abuse for v1 is intentionally light: server-side payload validation, a fixed-window per-IP rate limit (10/hour), a small embedded profanity wordlist, and a generous time-based score plausibility bound. No HMAC signing for v1, but the endpoint shape keeps a future `SIGNING_KEY` Worker-secret upgrade additive. Infrastructure-as-code lands in a new `wrangler.toml` at the repo root.
 
 For technologies, architecture, dependencies, project structure, shell commands, and the constitution-check gates for the active feature, read the current plan:
 
-- `specs/009-audio/plan.md` (technical context + constitution check + project tree)
-- `specs/009-audio/spec.md` (user stories, requirements, success criteria)
-- `specs/009-audio/research.md` (procedural-SFX decision, dual-BGM sourcing, gesture-latch pattern, mute-as-master-gain rationale)
-- `specs/009-audio/data-model.md` (`SfxName` + `BgmTrack` + `AudioEngineState` + constants)
-- `specs/009-audio/contracts/module-contracts.md` (new `src/audio/` module + `pause-button`-shaped mute-button adapter + game-loop / input-adapter / problem-modal integration points)
-- `specs/009-audio/quickstart.md` (slice-specific validation steps)
+- `specs/010-leaderboard/plan.md` (technical context + constitution check + project tree)
+- `specs/010-leaderboard/spec.md` (user stories, requirements, success criteria)
+- `specs/010-leaderboard/research.md` (KV-over-D1 decision, wrangler-format choice, rate-limit strategy, score plausibility formula, dev story, signing-key upgrade path)
+- `specs/010-leaderboard/data-model.md` (`LeaderboardEntry` + `SubmissionRequest/Response` + `PersonalBest` + `RateLimitBucket` + new `src/shared/config.ts` constants)
+- `specs/010-leaderboard/contracts/module-contracts.md` (new `src/leaderboard/` + `src/worker/` modules + renderer + game-loop integration)
+- `specs/010-leaderboard/contracts/api.md` (HTTP contract for GET/POST `/api/leaderboard` + forward-compat notes)
+- `specs/010-leaderboard/quickstart.md` (slice-specific validation, abuse-vector pass, operator playbook)
 
-The foundational architecture is captured in `specs/001-lane-runner/` through `specs/008-how-to-play/`. This slice introduces the first audio subsystem; no new runtime dependencies — pure Web Audio API.
+The foundational architecture is captured in `specs/001-lane-runner/` through `specs/009-audio/`. This slice introduces the first backend subsystem; new devDependencies are `wrangler` (CLI + types) and `@cloudflare/workers-types`. No new client runtime dependency.
 <!-- SPECKIT END -->
