@@ -57,6 +57,17 @@ describe('createLeaderboardPanel', () => {
     expect(rows.length).toBe(3);
   });
 
+  it('wraps the table in a scroll container so the heading can stay fixed', () => {
+    const panel = createLeaderboardPanel(host);
+    panel.render({
+      fetch: { kind: 'success', entries: [entry(100)] },
+      personalBestSurface: ABSENT,
+    });
+    const scroll = host.querySelector('.leaderboard-panel__scroll');
+    expect(scroll).not.toBeNull();
+    expect(scroll?.querySelector('table')).not.toBeNull();
+  });
+
   it('renders rank starting at #1', () => {
     const panel = createLeaderboardPanel(host);
     panel.render({

@@ -863,14 +863,19 @@
         right: clamp(10px, 2vw, 24px);
         bottom: clamp(10px, 2vh, 24px);
         max-width: min(420px, 92vw);
-        /* Fits the heading + thead + ~5 data rows (+ optional pinned)
-           before the scrollbar engages — keeps the panel compact so it
-           doesn't overlap the central start-screen instructions, while
-           still letting players scroll to the rest of the top 20. */
-        max-height: clamp(210px, 30vh, 250px);
-        overflow-y: auto;
         z-index: 11;
         font-size: clamp(0.8rem, 1.5vw, 0.95rem);
+      }
+
+      /* Inner scroll container: the heading lives OUTSIDE this so it stays
+         fixed above the rows, and only the table scrolls. Sized to fit
+         thead + ~5 data rows (+ optional pinned) before the scrollbar
+         engages — keeps the panel compact so it doesn't overlap the
+         central start-screen instructions, while still letting players
+         scroll to the rest of the top 20. */
+      .leaderboard-panel__scroll {
+        max-height: clamp(150px, 22vh, 200px);
+        overflow-y: auto;
         /* Tron-styled scrollbar (Firefox). */
         scrollbar-width: thin;
         scrollbar-color: rgba(24, 200, 255, 0.45) transparent;
@@ -878,15 +883,15 @@
 
       /* Tron-styled scrollbar (WebKit / Blink — Chrome, Edge, Safari).
          Thin track, glowing cyan thumb, brighter on hover. */
-      .leaderboard-panel::-webkit-scrollbar {
+      .leaderboard-panel__scroll::-webkit-scrollbar {
         width: 8px;
       }
-      .leaderboard-panel::-webkit-scrollbar-track {
+      .leaderboard-panel__scroll::-webkit-scrollbar-track {
         background: rgba(24, 200, 255, 0.06);
         border-radius: 4px;
         margin: 4px 2px;
       }
-      .leaderboard-panel::-webkit-scrollbar-thumb {
+      .leaderboard-panel__scroll::-webkit-scrollbar-thumb {
         background: linear-gradient(
           180deg,
           rgba(24, 200, 255, 0.55),
@@ -896,7 +901,7 @@
         box-shadow: 0 0 6px rgba(24, 200, 255, 0.25);
         transition: background 120ms ease-out, box-shadow 120ms ease-out;
       }
-      .leaderboard-panel::-webkit-scrollbar-thumb:hover {
+      .leaderboard-panel__scroll::-webkit-scrollbar-thumb:hover {
         background: linear-gradient(
           180deg,
           rgba(24, 200, 255, 0.85),
@@ -914,16 +919,8 @@
         font-size: clamp(1rem, 2vw, 1.2rem);
         font-weight: 700;
         letter-spacing: 0.04em;
-        margin: 0;
-        padding-bottom: 0.5em;
+        margin: 0 0 0.5em 0;
         text-align: center;
-        /* Stick to the top while the body scrolls so the player always
-           knows what panel they're in. Opaque background covers the rows
-           sliding underneath. */
-        position: sticky;
-        top: 0;
-        background: rgba(8, 12, 24, 0.95);
-        z-index: 2;
       }
 
       .leaderboard-panel__message {
@@ -952,13 +949,12 @@
         text-align: left;
         text-transform: uppercase;
         border-bottom: 1px solid rgba(24, 200, 255, 0.25);
-        /* Stick just below the sticky heading so the column labels stay
-           in view while the data rows scroll. top value matches the
-           heading's content height (font + padding-bottom + a touch of
-           line-height slack). */
+        /* Stick to the top of the scroll container so column labels stay
+           in view while the data rows scroll underneath. The background
+           is fully opaque (no alpha) so rows can't bleed through. */
         position: sticky;
-        top: clamp(28px, 4vw, 36px);
-        background: rgba(8, 12, 24, 0.95);
+        top: 0;
+        background: #0a0e1a;
         z-index: 1;
       }
 
@@ -1007,12 +1003,14 @@
       @media (max-width: 600px) {
         .leaderboard-panel {
           /* On narrow viewports, stretch full-width at the bottom so it
-             doesn't fight with the centred Tap-to-play prompt. Same
-             ~5-row cap as desktop — see the base rule above for why. */
+             doesn't fight with the centred Tap-to-play prompt. */
           right: clamp(8px, 2vw, 16px);
           left: clamp(8px, 2vw, 16px);
           bottom: clamp(8px, 1.5vh, 14px);
-          max-height: clamp(200px, 28vh, 240px);
+        }
+        .leaderboard-panel__scroll {
+          /* Same ~5-row cap as desktop — see the base rule for why. */
+          max-height: clamp(140px, 20vh, 190px);
         }
         .leaderboard-panel__cell--date {
           display: none;

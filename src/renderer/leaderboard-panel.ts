@@ -103,6 +103,12 @@ export function createLeaderboardPanel(host: HTMLElement): LeaderboardPanel {
     entries: readonly LeaderboardEntry[],
     surface: PersonalBestSurface,
   ): HTMLElement {
+    // Wrap the table in a scroll container so the panel heading can stay
+    // fixed above it (instead of being scrolled away or being painted over
+    // by rows bleeding through a translucent sticky background).
+    const scroll = doc.createElement('div');
+    scroll.className = 'leaderboard-panel__scroll';
+
     const table = doc.createElement('table');
     table.className = 'leaderboard-panel__table';
 
@@ -127,7 +133,8 @@ export function createLeaderboardPanel(host: HTMLElement): LeaderboardPanel {
       tbody.appendChild(buildRow(i + 1, entry, { highlighted }));
     });
     table.appendChild(tbody);
-    return table;
+    scroll.appendChild(table);
+    return scroll;
   }
 
   function render(snapshot: LeaderboardPanelSnapshot): void {
