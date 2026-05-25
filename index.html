@@ -863,10 +863,11 @@
         right: clamp(10px, 2vw, 24px);
         bottom: clamp(10px, 2vh, 24px);
         max-width: min(420px, 92vw);
-        /* Fits the heading + thead + about 10 data rows (+ optional pinned)
-           before the scrollbar engages — keeps the panel from running off
-           the bottom of the viewport on shorter screens. */
-        max-height: min(50vh, 380px);
+        /* Fits the heading + thead + ~5 data rows (+ optional pinned)
+           before the scrollbar engages — keeps the panel compact so it
+           doesn't overlap the central start-screen instructions, while
+           still letting players scroll to the rest of the top 20. */
+        max-height: clamp(210px, 30vh, 250px);
         overflow-y: auto;
         z-index: 11;
         font-size: clamp(0.8rem, 1.5vw, 0.95rem);
@@ -913,8 +914,16 @@
         font-size: clamp(1rem, 2vw, 1.2rem);
         font-weight: 700;
         letter-spacing: 0.04em;
-        margin: 0 0 0.6em 0;
+        margin: 0;
+        padding-bottom: 0.5em;
         text-align: center;
+        /* Stick to the top while the body scrolls so the player always
+           knows what panel they're in. Opaque background covers the rows
+           sliding underneath. */
+        position: sticky;
+        top: 0;
+        background: rgba(8, 12, 24, 0.95);
+        z-index: 2;
       }
 
       .leaderboard-panel__message {
@@ -943,6 +952,14 @@
         text-align: left;
         text-transform: uppercase;
         border-bottom: 1px solid rgba(24, 200, 255, 0.25);
+        /* Stick just below the sticky heading so the column labels stay
+           in view while the data rows scroll. top value matches the
+           heading's content height (font + padding-bottom + a touch of
+           line-height slack). */
+        position: sticky;
+        top: clamp(28px, 4vw, 36px);
+        background: rgba(8, 12, 24, 0.95);
+        z-index: 1;
       }
 
       .leaderboard-panel__head--rank,
@@ -990,11 +1007,12 @@
       @media (max-width: 600px) {
         .leaderboard-panel {
           /* On narrow viewports, stretch full-width at the bottom so it
-             doesn't fight with the centred Tap-to-play prompt. */
+             doesn't fight with the centred Tap-to-play prompt. Same
+             ~5-row cap as desktop — see the base rule above for why. */
           right: clamp(8px, 2vw, 16px);
           left: clamp(8px, 2vw, 16px);
           bottom: clamp(8px, 1.5vh, 14px);
-          max-height: 38vh;
+          max-height: clamp(200px, 28vh, 240px);
         }
         .leaderboard-panel__cell--date {
           display: none;
